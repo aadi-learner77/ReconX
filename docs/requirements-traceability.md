@@ -7,13 +7,13 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 
 | ID | Priority | Module | API Endpoint | Test File | Status |
 |---|---|---|---|---|---|
-| FR-AUTH-01 | P0 | `backend/app/api/v1/auth.py`, `core/security.py` | `POST /api/v1/auth/login`, `/refresh`, `/logout` | `backend/tests/test_auth_rbac.py` | NOT_STARTED |
-| FR-AUTH-02 | P0 | `backend/app/core/permissions.py` | All protected `/api/v1/*` routes | `backend/tests/test_auth_rbac.py` | NOT_STARTED |
-| FR-AUTH-03 | P0 | `backend/app/models/auth.py` | `GET /api/v1/auth/me`, `POST /api/v1/admin/users` | `backend/tests/test_auth_rbac.py` | NOT_STARTED |
+| FR-AUTH-01 | P0 | `backend/app/api/v1/auth.py`, `core/security.py` | `POST /api/v1/auth/login`, `/refresh`, `/logout` | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
+| FR-AUTH-02 | P0 | `backend/app/core/permissions.py` | All protected `/api/v1/*` routes | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
+| FR-AUTH-03 | P0 | `backend/app/models/auth.py` | `GET /api/v1/auth/me`, `POST /api/v1/admin/users` | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
 | FR-AUTH-04 | P1 | `backend/app/services/workflows/` | `POST /api/v1/exceptions/{id}/decision`, `PUT /api/v1/admin/config` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
-| FR-AUTH-05 | P0 | `backend/app/services/audit/` | All mutating `/api/v1/*` routes | `backend/tests/test_audit.py` | NOT_STARTED |
-| FR-CFG-01 | P0 | `backend/app/api/v1/admin.py`, `models/config.py` | `GET/PUT /api/v1/admin/config`, `/tolerances` | `backend/tests/test_admin_config.py` | NOT_STARTED |
-| FR-CFG-02 | P1 | `backend/app/models/config.py`, `services/audit/` | `PUT /api/v1/admin/config`, `GET /api/v1/audit` | `backend/tests/test_admin_config.py` | NOT_STARTED |
+| FR-AUTH-05 | P0 | `backend/app/services/audit/` | All mutating `/api/v1/*` routes | `backend/tests/test_audit.py` | IMPLEMENTED |
+| FR-CFG-01 | P0 | `backend/app/api/v1/admin.py`, `models/config.py` | `GET/PUT /api/v1/admin/config`, `/tolerances` | `backend/tests/test_admin_config.py` | IN_PROGRESS |
+| FR-CFG-02 | P1 | `backend/app/models/config.py`, `services/audit/` | `PUT /api/v1/admin/config`, `GET /api/v1/audit` | `backend/tests/test_admin_config.py` | IMPLEMENTED |
 | FR-DOC-01 | P0 | `backend/app/api/v1/documents.py`, `services/documents/` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
 | FR-DOC-02 | P0 | `backend/app/services/documents/classifier.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
 | FR-DOC-03 | P0 | `backend/app/models/document.py`, `services/documents/storage.py` | `POST /api/v1/documents`, `GET /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
@@ -73,9 +73,9 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | FR-UI-06 | P1 | `backend/app/services/agents/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_p2_features.py` | NOT_STARTED |
 | FR-UI-07 | P0 | `backend/app/services/agents/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_p2_features.py` | NOT_STARTED |
 | FR-UI-08 | P1 | `backend/app/api/v1/reports.py` | `GET /api/v1/reports/export` | `backend/tests/test_p2_features.py` | NOT_STARTED |
-| FR-AUD-01 | P0 | `backend/app/services/audit/service.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | NOT_STARTED |
-| FR-AUD-02 | P0 | `backend/app/models/audit.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | NOT_STARTED |
-| FR-AUD-03 | P0 | `backend/migrations/` (DB trigger) | `GET /api/v1/audit` | `backend/tests/test_audit.py` | NOT_STARTED |
+| FR-AUD-01 | P0 | `backend/app/services/audit/service.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
+| FR-AUD-02 | P0 | `backend/app/models/audit.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
+| FR-AUD-03 | P0 | `backend/migrations/` (DB trigger) | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
 | FR-NOT-01 | P1 | `backend/app/services/notifications/` | `GET /api/v1/notifications` | `backend/tests/test_notifications.py` | NOT_STARTED |
 | FR-NOT-02 | P0 | `backend/app/services/notifications/` | `GET /api/v1/notifications` | `backend/tests/test_notifications.py` | NOT_STARTED |
 
@@ -87,16 +87,16 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | NFR-PERF-02 | P0 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents`, `GET /api/v1/jobs/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
 | NFR-REL-01 | P0 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_failure_injection.py` | NOT_STARTED |
 | NFR-REL-02 | P0 | `backend/app/models/job.py`, `api/v1/admin.py` | `GET /api/v1/admin/jobs`, `POST /api/v1/admin/jobs/{id}/retry` | `backend/tests/test_failure_injection.py` | NOT_STARTED |
-| NFR-SEC-01 | P0 | `backend/app/core/security.py` | `POST /api/v1/auth/login` | `backend/tests/test_auth_rbac.py` | NOT_STARTED |
-| NFR-SEC-02 | P0 | `.env.example`, `backend/app/core/config.py` | N/A | `backend/tests/test_security_sweep.py` | NOT_STARTED |
-| NFR-SEC-03 | P0 | `backend/app/repositories/base.py`, `core/permissions.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | NOT_STARTED |
-| NFR-AUD-01 | P0 | `backend/app/services/audit/service.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | NOT_STARTED |
+| NFR-SEC-01 | P0 | `backend/app/core/security.py` | `POST /api/v1/auth/login` | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
+| NFR-SEC-02 | P0 | `.env.example`, `backend/app/core/config.py` | N/A | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
+| NFR-SEC-03 | P0 | `backend/app/repositories/base.py`, `core/permissions.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
+| NFR-AUD-01 | P0 | `backend/app/services/audit/service.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
 | NFR-MAINT-01 | P0 | `backend/app/services/*` | N/A | `backend/tests/test_architecture_boundaries.py` | NOT_STARTED |
 | NFR-TEST-01 | P0 | `backend/app/services/reconciliation/` | N/A | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
 | NFR-SCALE-01 | P1 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
 | NFR-UX-01 | P1 | `frontend/src/*` | N/A | `frontend/e2e/smoke.spec.ts` | NOT_STARTED |
 | NFR-PORT-01 | P1 | `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile` | `GET /api/v1/health` | `docs/deployment.md` | NOT_STARTED |
-| NFR-OBS-01 | P0 | `backend/app/core/logging.py`, `middleware.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | NOT_STARTED |
+| NFR-OBS-01 | P0 | `backend/app/core/logging.py`, `middleware.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
 
 ## Minimum Acceptance Scenarios (AT)
 
