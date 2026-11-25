@@ -10,8 +10,10 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { DocumentsPage } from "./pages/DocumentsPage";
 import { ExceptionDetailPage } from "./pages/ExceptionDetailPage";
 import { ExceptionsPage } from "./pages/ExceptionsPage";
+import { ExecutiveBriefPage } from "./pages/ExecutiveBriefPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ObligationGraphPage } from "./pages/ObligationGraphPage";
+import { PolicyStudioPage } from "./pages/PolicyStudioPage";
 import { TransactionDetailPage } from "./pages/TransactionDetailPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 import { VendorsPage } from "./pages/VendorsPage";
@@ -47,6 +49,8 @@ export const App: React.FC = () => {
           <Route path="cash" element={<CashViewPage />} />
           <Route path="agent-harness" element={<AgentHarnessPage />} />
           <Route path="obligation-graph" element={<ObligationGraphPage />} />
+          <Route path="policy-studio" element={<PolicyStudioPage />} />
+          <Route path="executive-brief" element={<ExecutiveBriefPage />} />
           <Route path="audit" element={<AuditPage />} />
           <Route path="admin" element={<AdminPage />} />
         </Route>

@@ -15,6 +15,7 @@ import {
   Network,
   Settings,
   ShieldCheck,
+  Sliders,
   Wallet,
   X,
 } from "lucide-react";
@@ -66,6 +67,8 @@ export const Layout: React.FC = () => {
   const intelligenceItems = [
     { to: "/agent-harness", label: "Agent Harness", icon: Cpu, show: hasPermission("exceptions:read") },
     { to: "/obligation-graph", label: "Obligation Graph", icon: Network, show: hasPermission("transactions:read") },
+    { to: "/policy-studio", label: "Policy Studio", icon: Sliders, show: hasPermission("policies:read") },
+    { to: "/executive-brief", label: "Executive Brief", icon: FileText, show: hasPermission("reports:read") },
   ].filter((n) => n.show);
 
   return (

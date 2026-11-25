@@ -191,4 +191,44 @@ export const api = {
     ),
   cashObligations: () => request<any>("/analytics/cash-obligations"),
   exportReportUrl: (fmt: "csv" | "pdf") => `${PREFIX}/reports/export?format=${fmt}`,
+  getPolicyMetadata: () => request<any>("/policies/metadata"),
+  listPolicies: (params: Record<string, string> = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== "" && v !== undefined)
+    ).toString();
+    return request<{ items: any[]; summary: Record<string, number> }>(
+      `/policies${qs ? `?${qs}` : ""}`
+    );
+  },
+  createPolicy: (payload: any) =>
+    request<any>("/policies", { method: "POST", body: JSON.stringify(payload) }),
+  updatePolicy: (id: string, payload: any) =>
+    request<any>(`/policies/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  validatePolicy: (id: string) =>
+    request<any>(`/policies/${id}/validate`, { method: "POST" }),
+  activatePolicy: (id: string) =>
+    request<any>(`/policies/${id}/activate`, { method: "POST" }),
+  deactivatePolicy: (id: string) =>
+    request<any>(`/policies/${id}/deactivate`, { method: "POST" }),
+  clonePolicy: (id: string) =>
+    request<any>(`/policies/${id}/clone`, { method: "POST" }),
+  previewPolicyImpact: (payload: any) =>
+    request<any>("/policies/preview", { method: "POST", body: JSON.stringify(payload) }),
+  listPolicyVersions: (id: string) => request<any[]>(`/policies/${id}/versions`),
+  listPolicyAudits: () => request<any[]>("/policy-audits"),
+  startPolicyAudit: (payload: any = {}) =>
+    request<any>("/policy-audits", { method: "POST", body: JSON.stringify(payload) }),
+  getPolicyAuditResults: (id: string) => request<any>(`/policy-audits/${id}/results`),
+  listExecutiveBriefs: () => request<any[]>("/executive-briefs"),
+  generateExecutiveBrief: (payload: any) =>
+    request<any>("/executive-briefs", { method: "POST", body: JSON.stringify(payload) }),
+  getExecutiveBrief: (id: string) => request<any>(`/executive-briefs/${id}`),
+  downloadExecutiveBrief: async (id: string, format: "pdf" | "markdown" | "csv") => {
+    const token = getAccessToken();
+    const resp = await fetch(`${PREFIX}/executive-briefs/${id}/download?format=${format}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) throw new ApiClientError("DOWNLOAD_FAILED", `HTTP ${resp.status}`, resp.status);
+    return resp.blob();
+  },
 };
