@@ -14,22 +14,22 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | FR-AUTH-05 | P0 | `backend/app/services/audit/` | All mutating `/api/v1/*` routes | `backend/tests/test_audit.py` | IMPLEMENTED |
 | FR-CFG-01 | P0 | `backend/app/api/v1/admin.py`, `models/config.py` | `GET/PUT /api/v1/admin/config`, `/tolerances` | `backend/tests/test_admin_config.py`, `test_domain_records.py` | IMPLEMENTED |
 | FR-CFG-02 | P1 | `backend/app/models/config.py`, `services/audit/` | `PUT /api/v1/admin/config`, `GET /api/v1/audit` | `backend/tests/test_admin_config.py` | IMPLEMENTED |
-| FR-DOC-01 | P0 | `backend/app/api/v1/documents.py`, `services/documents/` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-DOC-02 | P0 | `backend/app/services/documents/classifier.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-DOC-03 | P0 | `backend/app/models/document.py`, `services/documents/storage.py` | `POST /api/v1/documents`, `GET /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-DOC-04 | P0 | `backend/app/services/documents/ingestion.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-DOC-05 | P0 | `backend/app/services/documents/ocr.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-DOC-06 | P0 | `backend/app/api/v1/documents.py` | `PATCH /api/v1/documents/{id}/fields`, `POST /api/v1/documents/{id}/verify` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-DOC-07 | P1 | `backend/app/services/documents/extractor.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-DOC-08 | P0 | `backend/app/services/documents/validation.py` | `POST /api/v1/documents` | `backend/tests/test_security_uploads.py` | NOT_STARTED |
-| FR-EXT-01 | P0 | `backend/app/services/documents/extractor.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-EXT-02 | P0 | `backend/app/models/document.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-EXT-03 | P0 | `backend/app/services/documents/field_validator.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-EXT-04 | P0 | `backend/app/services/documents/field_validator.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| FR-EXT-05 | P1 | `backend/app/services/documents/linker.py` | `GET /api/v1/documents/{id}/candidates` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
+| FR-DOC-01 | P0 | `backend/app/api/v1/documents.py`, `services/documents/` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-DOC-02 | P0 | `backend/app/services/documents/extractor.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-DOC-03 | P0 | `backend/app/models/domain.py`, `services/documents/storage.py` | `POST /api/v1/documents`, `GET /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-DOC-04 | P0 | `backend/app/api/v1/documents.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-DOC-05 | P0 | `backend/app/services/documents/ocr.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-DOC-06 | P0 | `backend/app/api/v1/documents.py` | `PATCH /api/v1/documents/{id}/fields`, `POST /api/v1/documents/{id}/verify` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-DOC-07 | P1 | `backend/app/services/documents/extractor.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-DOC-08 | P0 | `backend/app/services/documents/validation.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-EXT-01 | P0 | `backend/app/services/documents/extractor.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-EXT-02 | P0 | `backend/app/models/domain.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-EXT-03 | P0 | `backend/app/services/documents/extractor.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-EXT-04 | P0 | `backend/app/services/documents/extractor.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-EXT-05 | P1 | `backend/app/services/documents/linker.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
 | FR-EXT-06 | P0 | `backend/app/services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
-| FR-EXT-07 | P0 | `backend/app/models/document.py` | `PATCH /api/v1/documents/{id}/fields` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-MAT-01 | P0 | `backend/app/services/documents/linker.py` | `POST /api/v1/documents/{id}/link` | `backend/tests/test_document_pipeline.py` | IN_PROGRESS |
+| FR-EXT-07 | P0 | `backend/app/models/domain.py` | `PATCH /api/v1/documents/{id}/fields` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| FR-MAT-01 | P0 | `backend/app/services/documents/linker.py` | `POST /api/v1/documents/{id}/link` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
 | FR-MAT-02 | P0 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
 | FR-MAT-03 | P0 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
 | FR-MAT-04 | P1 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
@@ -84,16 +84,16 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | ID | Priority | Module | API Endpoint | Test File | Status |
 |---|---|---|---|---|---|
 | NFR-PERF-01 | P1 | `backend/app/main.py` | `GET /api/v1/dashboard/summary`, `/transactions` | `backend/tests/test_performance.py` | NOT_STARTED |
-| NFR-PERF-02 | P0 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents`, `GET /api/v1/jobs/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| NFR-REL-01 | P0 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_failure_injection.py` | NOT_STARTED |
-| NFR-REL-02 | P0 | `backend/app/models/job.py`, `api/v1/admin.py` | `GET /api/v1/admin/jobs`, `POST /api/v1/admin/jobs/{id}/retry` | `backend/tests/test_failure_injection.py` | NOT_STARTED |
+| NFR-PERF-02 | P0 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents`, `GET /api/v1/jobs/{id}` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| NFR-REL-01 | P0 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
+| NFR-REL-02 | P0 | `backend/app/models/domain.py`, `api/v1/admin.py` | `GET /api/v1/admin/jobs`, `POST /api/v1/admin/jobs/{id}/retry` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
 | NFR-SEC-01 | P0 | `backend/app/core/security.py` | `POST /api/v1/auth/login` | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
 | NFR-SEC-02 | P0 | `.env.example`, `backend/app/core/config.py` | N/A | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
 | NFR-SEC-03 | P0 | `backend/app/repositories/base.py`, `core/permissions.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
 | NFR-AUD-01 | P0 | `backend/app/services/audit/service.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
 | NFR-MAINT-01 | P0 | `backend/app/services/*` | N/A | `backend/tests/test_architecture_boundaries.py` | NOT_STARTED |
 | NFR-TEST-01 | P0 | `backend/app/services/reconciliation/` | N/A | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
-| NFR-SCALE-01 | P1 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
+| NFR-SCALE-01 | P1 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
 | NFR-UX-01 | P1 | `frontend/src/*` | N/A | `frontend/e2e/smoke.spec.ts` | NOT_STARTED |
 | NFR-PORT-01 | P1 | `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile` | `GET /api/v1/health` | `docs/deployment.md` | NOT_STARTED |
 | NFR-OBS-01 | P0 | `backend/app/core/logging.py`, `middleware.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
@@ -108,7 +108,7 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | AT-04 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
 | AT-05 | P0 | `services/reconciliation/`, `services/risk/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
 | AT-06 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
-| AT-07 | P0 | `services/documents/` | `GET /api/v1/documents/{id}`, `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |
+| AT-07 | P0 | `services/documents/` | `GET /api/v1/documents/{id}`, `POST /api/v1/documents/{id}/verify` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
 | AT-08 | P0 | `services/agents/` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_acceptance.py` | NOT_STARTED |
 | AT-09 | P0 | `api/v1/exceptions.py`, `core/permissions.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_acceptance.py` | NOT_STARTED |
 | AT-10 | P0 | `services/graph/`, `services/reconciliation/` | `GET /api/v1/graph/transactions/{id}`, `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |

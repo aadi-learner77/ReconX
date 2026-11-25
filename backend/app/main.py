@@ -1,4 +1,5 @@
 import time
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -14,10 +15,22 @@ from app.core.exceptions import (
     validation_exception_handler,
 )
 from app.core.logging import configure_logging, correlation_id_var, get_logger, request_id_var
+from app.workers.job_worker import background_worker
 
 settings = get_settings()
 configure_logging(settings.log_level)
 logger = get_logger("reconx.api")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if settings.worker_enabled:
+        background_worker.start()
+    try:
+        yield
+    finally:
+        if settings.worker_enabled:
+            background_worker.stop()
 
 
 def create_app() -> FastAPI:
@@ -26,6 +39,7 @@ def create_app() -> FastAPI:
         version="1.0.0",
         openapi_url=f"{settings.api_prefix}/openapi.json",
         docs_url=f"{settings.api_prefix}/docs",
+        lifespan=lifespan,
     )
 
     app.add_middleware(

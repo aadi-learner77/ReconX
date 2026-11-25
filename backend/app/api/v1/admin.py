@@ -11,7 +11,7 @@ from app.core.permissions import CurrentUserContext, require_permission
 from app.core.security import hash_password
 from app.models.auth import Role, User
 from app.models.config import AppConfig
-from app.models.domain import ToleranceConfig
+from app.models.domain import Job, ToleranceConfig
 from app.repositories.base import OrgScopedRepository
 from app.schemas.admin import (
     AdminCreateUserRequest,
@@ -347,3 +347,73 @@ def upsert_tolerance(
     db.commit()
     db.refresh(tol)
     return _tol_response(tol)
+
+
+@router.get("/jobs")
+def list_admin_jobs(
+    status_filter: str | None = Query(default=None, alias="status"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=200),
+    current_user: CurrentUserContext = Depends(require_permission("admin:jobs:read")),
+    db: Session = Depends(get_db),
+) -> dict:
+    safe_page, safe_size, offset = paginate_params(page, page_size)
+    repo = OrgScopedRepository(db, Job, current_user.organization_id)
+    stmt = repo.base_query()
+    if status_filter:
+        stmt = stmt.where(Job.status == status_filter)
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = list(
+        db.scalars(stmt.order_by(desc(Job.created_at)).offset(offset).limit(safe_size)).all()
+    )
+    return {
+        "items": [
+            {
+                "job_id": str(j.id),
+                "job_type": j.job_type,
+                "entity_type": j.entity_type,
+                "entity_id": j.entity_id,
+                "status": j.status,
+                "attempts": j.attempts,
+                "max_attempts": j.max_attempts,
+                "last_error": j.last_error,
+                "created_at": j.created_at.isoformat(),
+            }
+            for j in rows
+        ],
+        "total": total,
+        "page": safe_page,
+        "page_size": safe_size,
+        "total_pages": max(1, ceil(total / safe_size)) if total else 1,
+    }
+
+
+@router.post("/jobs/{job_id}/retry")
+def retry_failed_job(
+    job_id: UUID,
+    current_user: CurrentUserContext = Depends(require_permission("admin:jobs:write")),
+    db: Session = Depends(get_db),
+) -> dict:
+    job = OrgScopedRepository(db, Job, current_user.organization_id).get_by_id(job_id)
+    if not job:
+        raise AppError("JOB_NOT_FOUND", "Job not found.", status.HTTP_404_NOT_FOUND)
+    if job.status != "FAILED":
+        raise AppError(
+            "JOB_NOT_RETRYABLE",
+            f"Only FAILED jobs can be manually retried (current status: {job.status}).",
+            status.HTTP_400_BAD_REQUEST,
+        )
+    job.status = "QUEUED"
+    job.attempts = 0
+    job.last_error = None
+    record_audit_event(
+        db,
+        organization_id=current_user.organization_id,
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action="JOB_MANUAL_RETRY",
+        entity_type="job",
+        entity_id=str(job.id),
+    )
+    db.commit()
+    return {"job_id": str(job.id), "status": job.status}
