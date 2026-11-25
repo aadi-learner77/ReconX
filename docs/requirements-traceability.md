@@ -83,20 +83,20 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 
 | ID | Priority | Module | API Endpoint | Test File | Status |
 |---|---|---|---|---|---|
-| NFR-PERF-01 | P1 | `backend/app/main.py` | `GET /api/v1/dashboard/summary`, `/transactions` | `backend/tests/test_performance.py` | NOT_STARTED |
+| NFR-PERF-01 | P1 | `backend/app/main.py` | `GET /api/v1/dashboard/summary`, `/transactions` | `backend/tests/test_hardening_security.py` | IMPLEMENTED |
 | NFR-PERF-02 | P0 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents`, `GET /api/v1/jobs/{id}` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
-| NFR-REL-01 | P0 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
-| NFR-REL-02 | P0 | `backend/app/models/domain.py`, `api/v1/admin.py` | `GET /api/v1/admin/jobs`, `POST /api/v1/admin/jobs/{id}/retry` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
-| NFR-SEC-01 | P0 | `backend/app/core/security.py` | `POST /api/v1/auth/login` | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
-| NFR-SEC-02 | P0 | `.env.example`, `backend/app/core/config.py` | N/A | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
-| NFR-SEC-03 | P0 | `backend/app/repositories/base.py`, `core/permissions.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
+| NFR-REL-01 | P0 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py`, `test_hardening_security.py` | IMPLEMENTED |
+| NFR-REL-02 | P0 | `backend/app/models/domain.py`, `api/v1/admin.py` | `GET /api/v1/admin/jobs`, `POST /api/v1/admin/jobs/{id}/retry` | `backend/tests/test_document_pipeline.py`, `test_hardening_security.py` | IMPLEMENTED |
+| NFR-SEC-01 | P0 | `backend/app/core/security.py` | `POST /api/v1/auth/login` | `backend/tests/test_auth_rbac.py`, `test_hardening_security.py` | IMPLEMENTED |
+| NFR-SEC-02 | P0 | `.env.example`, `backend/app/core/config.py` | N/A | `backend/tests/test_hardening_security.py` | IMPLEMENTED |
+| NFR-SEC-03 | P0 | `backend/app/repositories/base.py`, `core/permissions.py` | All `/api/v1/*` | `backend/tests/test_hardening_security.py` | IMPLEMENTED |
 | NFR-AUD-01 | P0 | `backend/app/services/audit/service.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
-| NFR-MAINT-01 | P0 | `backend/app/services/*` | N/A | `backend/tests/test_architecture_boundaries.py` | NOT_STARTED |
-| NFR-TEST-01 | P0 | `backend/app/services/reconciliation/` | N/A | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
+| NFR-MAINT-01 | P0 | `backend/app/services/*` | N/A | `backend/tests/test_hardening_security.py` | IMPLEMENTED |
+| NFR-TEST-01 | P0 | `backend/app/services/reconciliation/` | N/A | `backend/tests/test_reconciliation_engine.py`, `test_hardening_security.py` | IMPLEMENTED |
 | NFR-SCALE-01 | P1 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
 | NFR-UX-01 | P1 | `frontend/src/*` | N/A | `frontend/e2e/smoke.spec.ts` | IMPLEMENTED |
-| NFR-PORT-01 | P1 | `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile` | `GET /api/v1/health` | `docs/deployment.md` | NOT_STARTED |
-| NFR-OBS-01 | P0 | `backend/app/core/logging.py`, `middleware.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
+| NFR-PORT-01 | P1 | `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile` | `GET /api/v1/health` | `docs/deployment.md` (see `OD-07` for live Docker/PG check) | IMPLEMENTED |
+| NFR-OBS-01 | P0 | `backend/app/core/logging.py`, `middleware.py` | All `/api/v1/*` | `backend/tests/test_audit.py`, `test_hardening_security.py` | IMPLEMENTED |
 
 ## Minimum Acceptance Scenarios (AT)
 

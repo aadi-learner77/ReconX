@@ -47,12 +47,26 @@ class CopilotQueryRequest(BaseModel):
     question: str = Field(min_length=2, max_length=500)
 
 
+def _ensure_org_transaction(db: Session, organization_id: UUID, transaction_id: UUID) -> None:
+    po = OrgScopedRepository(db, PurchaseOrder, organization_id).get_by_id(transaction_id)
+    inv = (
+        None
+        if po is not None
+        else OrgScopedRepository(db, Invoice, organization_id).get_by_id(transaction_id)
+    )
+    if po is None and inv is None:
+        raise AppError(
+            "TRANSACTION_NOT_FOUND", "Transaction not found.", status.HTTP_404_NOT_FOUND
+        )
+
+
 @router.get("/transactions/{transaction_id}/risk")
 def get_transaction_risk(
     transaction_id: UUID,
     current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    _ensure_org_transaction(db, current_user.organization_id, transaction_id)
     signals = evaluate_transaction_risk(
         db,
         organization_id=current_user.organization_id,
@@ -280,6 +294,7 @@ def get_transaction_graph(
             "Financial Evidence Graph feature flag is disabled.",
             status.HTTP_503_SERVICE_UNAVAILABLE,
         )
+    _ensure_org_transaction(db, current_user.organization_id, transaction_id)
     return build_transaction_evidence_graph(
         db, organization_id=current_user.organization_id, transaction_id=transaction_id
     )
