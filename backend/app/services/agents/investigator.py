@@ -15,7 +15,11 @@ from app.services.agents.orchestrator import (
     OrchestrationContext,
 )
 from app.services.agents.tools import AgentToolbox
-from app.services.llm.adapter import get_llm_provider, wrap_untrusted_text
+from app.services.llm.adapter import (
+    get_llm_provider,
+    record_llm_telemetry,
+    wrap_untrusted_text,
+)
 
 
 class EvidenceRefItem(BaseModel):
@@ -206,6 +210,23 @@ def run_case_investigation(
         "vendor_tx_count": vendor_history.get("transaction_count", 0),
     }
     llm_out = llm.explain(llm_payload)
+    tel = llm.last_telemetry
+    if tel is not None:
+        record_llm_telemetry(
+            db, organization_id=current_user.organization_id, telemetry=tel
+        )
+
+    llm_used_live = bool(
+        isinstance(llm_out, dict)
+        and llm_out.get("summary")
+        and tel is not None
+        and tel.success
+        and not tel.fallback_used
+        and tel.actual_provider != "mock"
+    )
+    actual_provider = tel.actual_provider if (tel and llm_used_live) else "mock"
+    actual_model = tel.model_id if (tel and llm_used_live) else "mock-deterministic-v1"
+    fallback_used = bool(tel.fallback_used) if tel else (llm.provider_name != "mock")
 
     recommended_action = (
         "Hold full payment approval; verify receipt/credit note or escalate to approver."
@@ -260,11 +281,18 @@ def run_case_investigation(
     output_dict = structured.model_dump()
     output_dict["tool_trace"] = toolbox.tool_trace
     output_dict["execution_trace"] = [step.to_dict() for step in ctx.execution_trace]
+    output_dict["configured_provider"] = llm.provider_name
+    output_dict["actual_provider"] = actual_provider
+    output_dict["llm_succeeded"] = llm_used_live
+    output_dict["fallback_used"] = fallback_used
+    output_dict["operation_type"] = "explain"
+    output_dict["latency_ms"] = tel.latency_ms if tel else 0.0
+    output_dict["error_category"] = tel.error_category if tel else "NONE"
     inv_row = toolbox.create_investigation_draft(
         case_id=case.id,
         structured_findings=output_dict,
-        provider_name=llm.provider_name,
-        model_name=llm.model_name,
+        provider_name=actual_provider,
+        model_name=actual_model,
         confidence=structured.confidence,
     )
     db.commit()

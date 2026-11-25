@@ -5,6 +5,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -152,6 +153,26 @@ class ExecutiveBrief(Base):
     policy_diff_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     limitations_json: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     content_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class LLMTelemetry(Base):
+    __tablename__ = "llm_telemetry"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("organization.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    configured_provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    actual_provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    model_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    operation_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    fallback_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    latency_ms: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    error_category: Mapped[str] = mapped_column(String(64), nullable=False, default="NONE")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

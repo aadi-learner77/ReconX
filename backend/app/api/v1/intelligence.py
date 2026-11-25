@@ -29,6 +29,7 @@ from app.models.domain import (
     Vendor,
     VendorBankChange,
 )
+from app.models.policy import LLMTelemetry
 from app.repositories.base import OrgScopedRepository
 from app.services.agents.copilot import answer_copilot_query
 from app.services.agents.investigator import run_case_investigation
@@ -38,6 +39,7 @@ from app.services.graph.builder import (
     build_transaction_obligation_graph,
     rebuild_transaction_evidence_graph,
 )
+from app.services.llm.adapter import record_llm_telemetry, test_gemini_connection
 from app.services.risk.engine import compute_vendor_profile, evaluate_transaction_risk
 
 router = APIRouter(tags=["intelligence"])
@@ -249,6 +251,17 @@ def get_dashboard_summary(
         ).all()
     )
 
+    tel_rows = list(
+        db.scalars(
+            OrgScopedRepository(db, LLMTelemetry, org_id)
+            .base_query()
+            .order_by(desc(LLMTelemetry.created_at))
+            .limit(50)
+        ).all()
+    )
+    last_ok = next((t for t in tel_rows if t.success and not t.fallback_used), None)
+    settings = get_settings()
+
     return {
         "kpis": {
             "documents": docs_count,
@@ -259,6 +272,14 @@ def get_dashboard_summary(
                 1 for e in open_excs if e.status in {"OPEN", "IN_REVIEW", "ESCALATED"}
             ),
             "processing_jobs": job_counts["QUEUED"] + job_counts["PROCESSING"],
+        },
+        "ai_status": {
+            "configured_provider": settings.llm_provider,
+            "gemini_model": settings.gemini_model,
+            "api_key_configured": bool(settings.gemini_api_key.strip()),
+            "last_successful_provider": last_ok.actual_provider if last_ok else None,
+            "successful_calls": sum(1 for t in tel_rows if t.success and not t.fallback_used),
+            "fallback_count": sum(1 for t in tel_rows if t.fallback_used),
         },
         "outcome_breakdown": [{"outcome": k, "count": v} for k, v in outcome_counts.items()],
         "job_status": job_counts,
@@ -540,11 +561,34 @@ def get_agent_harness_overview(
                 "created_at": i.created_at.isoformat(),
                 "summary": out.get("summary", ""),
                 "human_approval_required": out.get("human_approval_required", True),
+                "configured_provider": out.get("configured_provider", i.model_provider),
+                "actual_provider": out.get("actual_provider", i.model_provider),
+                "llm_succeeded": out.get("llm_succeeded", i.model_provider != "mock"),
+                "fallback_used": out.get("fallback_used", False),
+                "operation_type": out.get("operation_type", "explain"),
+                "latency_ms": out.get("latency_ms", 0.0),
                 "evidence_refs": out.get("evidence_refs", []),
                 "execution_trace": out.get("execution_trace", []),
                 "tool_trace": out.get("tool_trace", []),
             }
         )
+
+    tel_rows = list(
+        db.scalars(
+            OrgScopedRepository(db, LLMTelemetry, org_id)
+            .base_query()
+            .order_by(desc(LLMTelemetry.created_at))
+            .limit(100)
+        ).all()
+    )
+    gemini_rows = [t for t in tel_rows if t.configured_provider == "gemini"]
+    last_gemini_ok = next((t for t in gemini_rows if t.success and not t.fallback_used), None)
+    last_any_ok = next((t for t in tel_rows if t.success and not t.fallback_used), None)
+    avg_lat = (
+        round(sum(t.latency_ms for t in gemini_rows) / len(gemini_rows), 2)
+        if gemini_rows
+        else 0.0
+    )
 
     return {
         "system_status": {
@@ -557,10 +601,40 @@ def get_agent_harness_overview(
                 1 for t in recent_traces if t["status"] in ("DRAFT_READY", "COMPLETED")
             ),
         },
+        "gemini_telemetry": {
+            "configured_provider": settings.llm_provider,
+            "gemini_model": settings.gemini_model,
+            "api_key_configured": bool(settings.gemini_api_key.strip()),
+            "last_successful_provider": last_any_ok.actual_provider if last_any_ok else None,
+            "last_successful_at": (
+                last_gemini_ok.created_at.isoformat() if last_gemini_ok else None
+            ),
+            "invocation_count": len(gemini_rows),
+            "successful_calls": sum(
+                1 for t in gemini_rows if t.success and not t.fallback_used
+            ),
+            "failed_calls": sum(1 for t in gemini_rows if not t.success),
+            "fallback_count": sum(1 for t in gemini_rows if t.fallback_used),
+            "avg_latency_ms": avg_lat,
+            "token_usage_available": False,
+        },
         "configured_agents": configured_agents,
         "harness_components": harness_components,
         "recent_traces": recent_traces,
     }
+
+
+@router.post("/intelligence/gemini/test")
+def test_gemini_endpoint(
+    current_user: CurrentUserContext = Depends(require_permission("admin:config:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    res = test_gemini_connection()
+    tel = res.pop("telemetry", None)
+    if tel is not None:
+        record_llm_telemetry(db, organization_id=current_user.organization_id, telemetry=tel)
+        db.commit()
+    return res
 
 
 @router.post("/copilot/query")
