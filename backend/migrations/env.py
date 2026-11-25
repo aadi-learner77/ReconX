@@ -9,6 +9,7 @@ import app.models.audit  # noqa: F401
 import app.models.auth  # noqa: F401
 import app.models.config  # noqa: F401
 import app.models.domain  # noqa: F401
+import app.models.policy  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

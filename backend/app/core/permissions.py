@@ -24,6 +24,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "investigations:run",
         "copilot:read",
         "reports:export",
+        "policies:read",
+        "reports:read",
+        "reports:generate",
+        "reports:download",
     },
     "approver": {
         "transactions:read",
@@ -35,6 +39,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "investigations:run",
         "copilot:read",
         "reports:export",
+        "policies:read",
+        "reports:read",
+        "reports:generate",
+        "reports:download",
     },
     "procurement": {
         "transactions:read",
@@ -64,6 +72,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "audit:read",
         "copilot:read",
         "reports:export",
+        "policies:read",
+        "reports:read",
+        "reports:generate",
+        "reports:download",
     },
     "admin": {
         "transactions:read",
@@ -87,6 +99,14 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "admin:jobs:write",
         "copilot:read",
         "reports:export",
+        "policies:read",
+        "policies:create",
+        "policies:update",
+        "policies:activate",
+        "policies:audit",
+        "reports:read",
+        "reports:generate",
+        "reports:download",
     },
 }
 
