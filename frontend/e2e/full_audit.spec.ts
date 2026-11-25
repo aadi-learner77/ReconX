@@ -41,6 +41,7 @@ test("full website audit across all routes, workflows, RBAC, and viewports", asy
   await page.fill("#password", DEMO_PASSWORD);
   await page.click('button[type="submit"]');
   await expect(page.getByText("Finance Operations Dashboard")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("Gemini-Powered Financial Intelligence")).toBeVisible();
   await page.screenshot({ path: "playwright-report/audit-dashboard.png", fullPage: true });
 
   // Reload persistence check
@@ -94,6 +95,7 @@ test("full website audit across all routes, workflows, RBAC, and viewports", asy
   // 6b. Agent Harness Explorer (/agent-harness)
   await page.click('a[href="/agent-harness"]');
   await expect(page.getByText("Inside the ReconX Intelligence Engine")).toBeVisible();
+  await expect(page.getByText("Google Gemini Integration")).toBeVisible();
   await expect(page.getByText(/AI RECOMMENDATION ≠ FINANCIAL AUTHORIZATION/)).toBeVisible();
   await expect(page.getByText("Live Execution Trace Explorer")).toBeVisible();
   await page.screenshot({ path: "playwright-report/audit-agent-harness.png", fullPage: true });
