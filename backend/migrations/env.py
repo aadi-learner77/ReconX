@@ -5,9 +5,10 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 from app.core.database import Base
-import app.models.auth  # noqa: F401
 import app.models.audit  # noqa: F401
+import app.models.auth  # noqa: F401
 import app.models.config  # noqa: F401
+import app.models.domain  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

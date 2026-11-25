@@ -11,6 +11,7 @@ from app.core.permissions import CurrentUserContext, require_permission
 from app.core.security import hash_password
 from app.models.auth import Role, User
 from app.models.config import AppConfig
+from app.models.domain import ToleranceConfig
 from app.repositories.base import OrgScopedRepository
 from app.schemas.admin import (
     AdminCreateUserRequest,
@@ -20,6 +21,7 @@ from app.schemas.admin import (
     AppConfigUpdateRequest,
 )
 from app.schemas.common import PaginatedResponse, paginate_params
+from app.schemas.domain import ToleranceConfigRequest, ToleranceConfigResponse
 from app.services.audit.service import record_audit_event
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -234,3 +236,114 @@ def update_config(
         updated_by=new_cfg.updated_by,
         created_at=new_cfg.created_at,
     )
+
+
+def _tol_response(tol: ToleranceConfig) -> ToleranceConfigResponse:
+    return ToleranceConfigResponse(
+        id=tol.id,
+        organization_id=tol.organization_id,
+        vendor_id=tol.vendor_id,
+        item_code=tol.item_code,
+        price_abs_tolerance=tol.price_abs_tolerance,
+        price_pct_tolerance=tol.price_pct_tolerance,
+        qty_abs_tolerance=tol.qty_abs_tolerance,
+        qty_pct_tolerance=tol.qty_pct_tolerance,
+        tax_abs_tolerance=tol.tax_abs_tolerance,
+        allow_partial_billing=tol.allow_partial_billing,
+        allow_service_advance_billing=tol.allow_service_advance_billing,
+        version=tol.version,
+        is_active=tol.is_active,
+        updated_by=tol.updated_by,
+        created_at=tol.created_at,
+    )
+
+
+@router.get("/tolerances", response_model=list[ToleranceConfigResponse])
+def list_tolerances(
+    current_user: CurrentUserContext = Depends(require_permission("admin:config:read")),
+    db: Session = Depends(get_db),
+) -> list[ToleranceConfigResponse]:
+    repo = OrgScopedRepository(db, ToleranceConfig, current_user.organization_id)
+    rows = list(
+        db.scalars(
+            repo.base_query()
+            .where(ToleranceConfig.is_active.is_(True))
+            .order_by(desc(ToleranceConfig.created_at))
+        ).all()
+    )
+    return [_tol_response(r) for r in rows]
+
+
+@router.post(
+    "/tolerances",
+    response_model=ToleranceConfigResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def upsert_tolerance(
+    payload: ToleranceConfigRequest,
+    current_user: CurrentUserContext = Depends(require_permission("admin:config:write")),
+    db: Session = Depends(get_db),
+) -> ToleranceConfigResponse:
+    repo = OrgScopedRepository(db, ToleranceConfig, current_user.organization_id)
+    stmt = repo.base_query().where(ToleranceConfig.is_active.is_(True))
+    if payload.vendor_id is None:
+        stmt = stmt.where(ToleranceConfig.vendor_id.is_(None))
+    else:
+        stmt = stmt.where(ToleranceConfig.vendor_id == payload.vendor_id)
+    if payload.item_code is None:
+        stmt = stmt.where(ToleranceConfig.item_code.is_(None))
+    else:
+        stmt = stmt.where(ToleranceConfig.item_code == payload.item_code)
+
+    prev = db.scalar(stmt.order_by(desc(ToleranceConfig.version)))
+    before = (
+        {
+            "price_abs": str(prev.price_abs_tolerance),
+            "price_pct": str(prev.price_pct_tolerance),
+            "qty_abs": str(prev.qty_abs_tolerance),
+            "qty_pct": str(prev.qty_pct_tolerance),
+        }
+        if prev
+        else None
+    )
+    next_ver = (prev.version + 1) if prev else 1
+    if prev:
+        prev.is_active = False
+
+    tol = ToleranceConfig(
+        organization_id=current_user.organization_id,
+        vendor_id=payload.vendor_id,
+        item_code=payload.item_code,
+        price_abs_tolerance=payload.price_abs_tolerance,
+        price_pct_tolerance=payload.price_pct_tolerance,
+        qty_abs_tolerance=payload.qty_abs_tolerance,
+        qty_pct_tolerance=payload.qty_pct_tolerance,
+        tax_abs_tolerance=payload.tax_abs_tolerance,
+        allow_partial_billing=payload.allow_partial_billing,
+        allow_service_advance_billing=payload.allow_service_advance_billing,
+        version=next_ver,
+        is_active=True,
+        updated_by=str(current_user.id),
+    )
+    db.add(tol)
+    db.flush()
+    record_audit_event(
+        db,
+        organization_id=current_user.organization_id,
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action="TOLERANCE_UPDATED",
+        entity_type="tolerance_config",
+        entity_id=str(tol.id),
+        before=before,
+        after={
+            "price_abs": str(tol.price_abs_tolerance),
+            "price_pct": str(tol.price_pct_tolerance),
+            "qty_abs": str(tol.qty_abs_tolerance),
+            "qty_pct": str(tol.qty_pct_tolerance),
+            "version": tol.version,
+        },
+    )
+    db.commit()
+    db.refresh(tol)
+    return _tol_response(tol)

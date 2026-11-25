@@ -12,7 +12,7 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | FR-AUTH-03 | P0 | `backend/app/models/auth.py` | `GET /api/v1/auth/me`, `POST /api/v1/admin/users` | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
 | FR-AUTH-04 | P1 | `backend/app/services/workflows/` | `POST /api/v1/exceptions/{id}/decision`, `PUT /api/v1/admin/config` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
 | FR-AUTH-05 | P0 | `backend/app/services/audit/` | All mutating `/api/v1/*` routes | `backend/tests/test_audit.py` | IMPLEMENTED |
-| FR-CFG-01 | P0 | `backend/app/api/v1/admin.py`, `models/config.py` | `GET/PUT /api/v1/admin/config`, `/tolerances` | `backend/tests/test_admin_config.py` | IN_PROGRESS |
+| FR-CFG-01 | P0 | `backend/app/api/v1/admin.py`, `models/config.py` | `GET/PUT /api/v1/admin/config`, `/tolerances` | `backend/tests/test_admin_config.py`, `test_domain_records.py` | IMPLEMENTED |
 | FR-CFG-02 | P1 | `backend/app/models/config.py`, `services/audit/` | `PUT /api/v1/admin/config`, `GET /api/v1/audit` | `backend/tests/test_admin_config.py` | IMPLEMENTED |
 | FR-DOC-01 | P0 | `backend/app/api/v1/documents.py`, `services/documents/` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
 | FR-DOC-02 | P0 | `backend/app/services/documents/classifier.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
