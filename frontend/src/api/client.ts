@@ -122,6 +122,19 @@ export const api = {
     }),
   getTransactionGraph: (id: string) =>
     request<{ nodes: any[]; edges: any[]; source: string }>(`/graph/transactions/${id}`),
+  rebuildTransactionGraph: (id: string) =>
+    request<{ nodes: any[]; edges: any[]; source: string }>(`/graph/transactions/${id}/rebuild`, {
+      method: "POST",
+    }),
+  getObligationGraph: (id: string) =>
+    request<{
+      nodes: any[];
+      edges: any[];
+      summary: Record<string, string>;
+      has_payment_records: boolean;
+      source: string;
+    }>(`/graph/obligations/${id}`),
+  getAgentHarnessOverview: () => request<any>("/intelligence/agent-harness"),
   getTransactionRisk: (id: string) =>
     request<{ transaction_id: string; disclaimer: string; signals: any[] }>(`/transactions/${id}/risk`),
   listExceptions: (statusFilter = "") =>

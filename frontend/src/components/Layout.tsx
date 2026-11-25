@@ -5,14 +5,18 @@ import {
   Bell,
   Building2,
   ClipboardList,
+  Cpu,
   FileText,
   GitCompare,
   LayoutDashboard,
   LogOut,
+  Menu,
   MessageSquare,
+  Network,
   Settings,
   ShieldCheck,
   Wallet,
+  X,
 } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/client";
@@ -22,6 +26,7 @@ export const Layout: React.FC = () => {
   const qc = useQueryClient();
   const [notifOpen, setNotifOpen] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [copilotResult, setCopilotResult] = useState<{
     answer: string;
@@ -58,12 +63,36 @@ export const Layout: React.FC = () => {
     { to: "/admin", label: "Admin Settings", icon: Settings, show: hasPermission("admin:config:read") },
   ].filter((n) => n.show);
 
+  const intelligenceItems = [
+    { to: "/agent-harness", label: "Agent Harness", icon: Cpu, show: hasPermission("exceptions:read") },
+    { to: "/obligation-graph", label: "Obligation Graph", icon: Network, show: hasPermission("transactions:read") },
+  ].filter((n) => n.show);
+
   return (
     <div className="min-h-screen flex bg-slate-50">
-      <aside className="w-60 bg-slate-900 text-slate-100 flex flex-col shrink-0">
-        <div className="p-5 border-b border-slate-800">
-          <div className="text-lg font-bold tracking-tight">ReconX AI</div>
-          <div className="text-xs text-slate-400 mt-0.5 truncate">{user?.organization_name}</div>
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 z-40 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      <aside
+        className={`${
+          mobileNavOpen ? "fixed inset-y-0 left-0 z-50 flex" : "hidden"
+        } md:static md:flex w-60 bg-slate-900 text-slate-100 flex-col shrink-0`}
+      >
+        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="text-lg font-bold tracking-tight">ReconX AI</div>
+            <div className="text-xs text-slate-400 mt-0.5 truncate">{user?.organization_name}</div>
+          </div>
+          <button
+            aria-label="Close navigation"
+            onClick={() => setMobileNavOpen(false)}
+            className="md:hidden p-1 text-slate-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => {
@@ -73,6 +102,7 @@ export const Layout: React.FC = () => {
                 key={item.to}
                 to={item.to}
                 end={item.to === "/"}
+                onClick={() => setMobileNavOpen(false)}
                 className={({ isActive }) =>
                   `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
                     isActive ? "bg-indigo-600 text-white" : "text-slate-300 hover:bg-slate-800"
@@ -84,6 +114,33 @@ export const Layout: React.FC = () => {
               </NavLink>
             );
           })}
+          {intelligenceItems.length > 0 && (
+            <div className="pt-4">
+              <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                INTELLIGENCE
+              </div>
+              {intelligenceItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => setMobileNavOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                        isActive
+                          ? "bg-indigo-600 text-white"
+                          : "text-slate-300 hover:bg-slate-800"
+                      }`
+                    }
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
+          )}
         </nav>
         <div className="p-4 border-t border-slate-800 text-xs">
           <div className="font-medium text-slate-200 truncate">{user?.full_name}</div>
@@ -99,9 +156,18 @@ export const Layout: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between">
-          <div className="text-sm text-slate-500">
-            Autonomous Three-Way Reconciliation • Deterministic Finance Engine
+        <header className="h-14 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              aria-label="Open navigation"
+              onClick={() => setMobileNavOpen(true)}
+              className="md:hidden p-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+            <div className="hidden sm:block text-sm text-slate-500 truncate">
+              Autonomous Three-Way Reconciliation • Deterministic Finance Engine
+            </div>
           </div>
           <div className="flex items-center gap-3 relative">
             {hasPermission("copilot:read") && (
