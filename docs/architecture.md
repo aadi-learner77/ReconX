@@ -30,6 +30,8 @@ flowchart LR
 
 - **Frontend Views:** Includes `AgentHarnessPage` (`/agent-harness`) for 7-stage orchestration & live trace inspection, and `ObligationGraphPage` (`/obligation-graph`) with `Obligation View` + `Evidence View` over the same PostgreSQL/SQLite source of truth.
 
+- **Google Gemini API Integration:** `LLMProvider` (`backend/app/services/llm/adapter.py`) invokes `gemini-2.5-flash` for `InvestigationAgent` narrative synthesis (`explain`) and optional `classify`/`extract`, persisting real `LLMTelemetry` metrics (`actual_provider`, `fallback_used`, `latency_ms`, `error_category`) while keeping `GEMINI_API_KEY` strictly backend-only.
+
 ## 2. Trust Boundaries & Financial Guarantees
 
 1. **Deterministic Finance Boundary (`app/services/reconciliation/`)**:

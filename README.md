@@ -12,14 +12,63 @@ ReconX AI reconciles **Purchase Orders (PO)**, **Goods Receipt Notes (GRN)**, an
 
 ## Architecture & Key Documents
 
-- [System Architecture](docs/architecture.md) — component diagram & trust boundaries
-- [Software Requirements Specification](docs/SRS.md) & [Decisions Log](docs/DECISIONS.md)
-- [Requirements Traceability Matrix](docs/requirements-traceability.md)
+```mermaid
+flowchart LR
+    U["Finance Operator / Approver / Auditor / Admin"] --> FE["React + TypeScript SPA (Vite, Tailwind, React Flow, Recharts)"]
+    FE -->|"HTTPS + JWT + X-Correlation-ID"| API["FastAPI Backend (/api/v1/*)"]
+
+    subgraph Core["FastAPI Backend"]
+        AUTH["Auth & RBAC (Argon2 + HS256 JWT)"]
+        DOC["Document Ingestion (PyMuPDF + RapidOCR + openpyxl)"]
+        RECON["Deterministic 3-Way Match Engine (decimal.Decimal ONLY)"]
+        POL["Dynamic Policy Engine & Re-Audit (Constrained Decimal DSL)"]
+        BRIEF["Executive Brief Engine (PDF / Markdown / CSV + CIT-* Citations)"]
+        RISK["Risk Indicators (Split-Invoice, Shared Bank, MAD, IsolationForest)"]
+        AGENT["7-Stage FinanceOrchestrator & Read-Only Copilot"]
+        AUDIT["Immutable Audit Trail (DB Triggers)"]
+    end
+
+    API --> AUTH & DOC & RECON & POL & BRIEF & RISK & AGENT & AUDIT
+    AGENT -->|"<<<UNTRUSTED_DOCUMENT_CONTENT>>>"| LLM["LLMProvider (mock / gemini-2.5-flash / groq / ollama) + LLMTelemetry"]
+    Core --> DB[("PostgreSQL 16 / SQLite (NUMERIC(18,4) + Append-Only Audit)")]
+```
+
+### 7-Stage Agent Harness (`FinanceOrchestrator`)
+
+```mermaid
+flowchart LR
+    O["FinanceOrchestrator"] --> D["1. DocumentAgent"] --> M["2. MatchingAgent"] --> R["3. RiskAgent"] --> V["4. VendorIntelligenceAgent"] --> G["5. EvidenceGraphAgent"] --> I["6. InvestigationAgent (Gemini / Fallback)"] --> A["7. AuditAgent + Human Approval Gate"]
+```
+
+- [System Architecture](docs/architecture.md) & [Agent Architecture](docs/agent-architecture.md)
+- [Software Requirements Specification](docs/SRS.md), [Decisions Log](docs/DECISIONS.md) & [Traceability Matrix](docs/requirements-traceability.md)
+- [Dynamic Policy Engine](docs/policy-engine.md) & [Executive Boardroom Brief](docs/executive-brief.md)
 - [API Reference](docs/api.md) & [API Contracts](docs/api-contracts.md)
-- [Deployment Guide](docs/deployment.md) — Docker Compose + Render / Neon / Supabase / Vercel / Netlify free tiers
-- [7-Minute Demo Script](docs/demo-script.md)
-- [Measured Evaluation Report](docs/evaluation-report.md)
-- [Pitch & Roadmap Outline](docs/pitch-outline.md)
+- [Deployment Guide](docs/deployment.md) & [Docker + PostgreSQL Verification](docs/docker-postgresql-verification.md)
+- [7-Minute Demo Script](docs/demo-script.md) & [Judge Q&A](docs/judge-qa.md)
+- [Measured Evaluation Report](docs/evaluation-report.md) & [Benchmark Report](docs/benchmark-report.md)
+
+---
+
+## Screenshots
+
+### Finance Operations Dashboard & Gemini Status
+![Finance Operations Dashboard](docs/screenshots/audit-dashboard.png)
+
+### Three-Way Match Detail & Financial Evidence Graph
+![Three-Way Match Detail](docs/screenshots/audit-transaction-detail.png)
+
+### AI Agent Harness Explorer & Google Gemini Telemetry (`/agent-harness`)
+![AI Agent Harness Explorer](docs/screenshots/audit-agent-harness.png)
+
+### Financial Obligation Graph (`/obligation-graph`)
+![Financial Obligation Graph](docs/screenshots/audit-obligation-graph.png)
+
+### Zero-Code Policy Studio & Re-Audit (`/policy-studio`)
+![Policy Studio](docs/screenshots/audit-policy-studio.png)
+
+### Executive Boardroom Brief with Verified Citations (`/executive-brief`)
+![Executive Boardroom Brief](docs/screenshots/audit-executive-brief.png)
 
 ---
 
@@ -116,6 +165,15 @@ All environment variables are documented with safe non-secret defaults in [`.env
 - **Google Gemini (free key)**: `LLM_PROVIDER=gemini`, `GEMINI_API_KEY=<key>`
 - **Groq (free key)**: `LLM_PROVIDER=groq`, `GROQ_API_KEY=<key>`
 - **Ollama (local)**: run `ollama pull llama3.2`, set `LLM_PROVIDER=ollama`
+
+---
+
+## Google Gemini API Integration
+
+AI assistance in ReconX AI is **powered by the Google Gemini API** (`gemini-2.5-flash` via `LLM_PROVIDER=gemini` and `GEMINI_API_KEY`, kept strictly backend-only).
+- **Exact Operations Using Gemini:** `InvestigationAgent` (`LLMProvider.explain` for natural-language discrepancy summaries over DB-verified facts) and optional document classification/extraction fallback (`LLMProvider.classify` / `extract`) in [adapter.py](backend/app/services/llm/adapter.py).
+- **Security & Determinism:** All document text is fenced in `<<<UNTRUSTED_DOCUMENT_CONTENT>>>`, `decimal.Decimal` 3-way matching never calls Gemini, and `validate_evidence_refs` rejects any unresolvable citation.
+- **Fallback & Telemetry:** If Gemini is unconfigured (`mock` default), times out, or hits rate/auth errors, ReconX degrades gracefully to deterministic local templates and records `fallback_used=true` + `actual_provider="mock"` in `llm_telemetry` (never mislabeling fallback output as Gemini-generated).
 
 ---
 
