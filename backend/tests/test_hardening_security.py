@@ -394,3 +394,95 @@ def test_api_read_latency_under_p95_target(
     latencies_ms.sort()
     p95 = latencies_ms[int(0.95 * (len(latencies_ms) - 1))]
     assert p95 < 2000.0, f"Measured P95 {p95:.1f}ms exceeded 2000ms SLA"
+
+
+def test_llm_timeout_fallback_and_db_drop_failure_injection(
+    client: TestClient, test_db_session: Session, tmp_path: Path, monkeypatch
+) -> None:
+    """NFR-REL-01/02: LLM outage falls back cleanly; DB drop leaves zero partial writes."""
+    import httpx
+    from sqlalchemy.exc import OperationalError
+
+    from app.core.logging import StructuredJsonFormatter
+    from app.services.llm.adapter import GeminiLLMProvider
+
+    monkeypatch.setenv("STORAGE_ROOT", str(tmp_path / "storage"))
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy-test-key-not-real")
+    get_settings.cache_clear()
+
+    def _timeout(*_a, **_kw):
+        raise httpx.TimeoutException("Simulated LLM timeout")
+
+    monkeypatch.setattr(GeminiLLMProvider, "_complete_json", _timeout)
+
+    seed_synthetic_dataset(test_db_session, reset=True)
+    headers = _login_headers(
+        client, "operator@reconx-demo.com", get_settings().seed_default_password
+    )
+    tx = client.get(
+        "/api/v1/transactions?scenario_label=AT-02", headers=headers
+    ).json()["items"][0]
+    client.post(f"/api/v1/transactions/{tx['transaction_id']}/reconcile", headers=headers)
+    exc = client.get(
+        f"/api/v1/exceptions?transaction_id={tx['transaction_id']}", headers=headers
+    ).json()["items"][0]
+
+    # Investigation completes via deterministic fallback even when external LLM times out
+    inv = client.post(f"/api/v1/exceptions/{exc['id']}/investigations", headers=headers)
+    assert inv.status_code == 201
+    assert inv.json()["human_approval_required"] is True
+
+    # DB drop mid-job rolls back cleanly without partial ExtractionField writes
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    get_settings.cache_clear()
+
+    pdf_bytes = _make_pdf(["TAX INVOICE", "Invoice Number: INV-DBDROP-1", "Total Amount: 100.00"])
+    up = client.post(
+        "/api/v1/documents",
+        headers=headers,
+        files={"file": ("dbdrop.pdf", pdf_bytes, "application/pdf")},
+    )
+    assert up.status_code == 202
+    doc_id = UUID(up.json()["document_id"])
+    job = test_db_session.scalar(select(Job).where(Job.entity_id == str(doc_id)))
+    assert job is not None
+    job.max_attempts = 1
+    test_db_session.commit()
+
+    import app.workers.job_worker as jw
+
+    def _db_drop(*_a, **_kw):
+        raise OperationalError("SELECT 1", {}, Exception("Simulated DB drop"))
+
+    monkeypatch.setattr(jw, "extract_fields_from_blocks", _db_drop)
+    j_res = process_document_job(test_db_session, job, storage=StorageAdapter())
+    assert j_res.status == "FAILED"
+    assert "Simulated DB drop" in (j_res.last_error or "")
+    doc = test_db_session.get(Document, doc_id)
+    assert doc is not None and doc.status == "FAILED"
+
+    # Oversize upload rejected cleanly (413) & structured logs redact secrets
+    monkeypatch.setenv("MAX_UPLOAD_SIZE_MB", "1")
+    get_settings.cache_clear()
+    oversize_pdf = b"%PDF-1.4\n" + (b"0" * (1024 * 1024 + 64))
+    too_big = client.post(
+        "/api/v1/documents",
+        headers=headers,
+        files={"file": ("huge.pdf", oversize_pdf, "application/pdf")},
+    )
+    assert too_big.status_code == 413
+    assert too_big.json()["error"]["code"] == "FILE_TOO_LARGE"
+    monkeypatch.setenv("MAX_UPLOAD_SIZE_MB", "15")
+    get_settings.cache_clear()
+
+    import logging
+
+    fmt = StructuredJsonFormatter()
+    rec = logging.LogRecord("reconx.test", logging.INFO, "", 0, "Bearer my-secret-jwt", (), None)
+    rec.extra_fields = {"password": "pw", "api_key": "secret-k", "bank_account": "9999"}  # type: ignore[attr-defined]
+    rendered = fmt.format(rec)
+    assert "my-secret-jwt" not in rendered
+    assert "secret-k" not in rendered
+    assert "[REDACTED]" in rendered

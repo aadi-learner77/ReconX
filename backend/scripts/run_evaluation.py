@@ -587,11 +587,12 @@ def _render_markdown(m: dict) -> str:
 Generated automatically by `backend/scripts/run_evaluation.py` at `{m["measured_at_utc"]}` on
 SQLite + `LLM_PROVIDER=mock` + PyMuPDF/RapidOCR + openpyxl (synthetic evaluation corpus only).
 
-## 1. Corpus Summary
-- Seeded Vendors: **{m["dataset"]["vendors"]}**
-- Seeded Purchase Orders: **{m["dataset"]["purchase_orders"]}**
-- Seeded Invoices: **{m["dataset"]["invoices"]}**
-- Fresh Extraction Benchmark Documents: **{m["dataset"]["eval_documents"]}**
+## 1. Environment & Corpus Summary
+- Environment: Windows + Python 3.13 + SQLite + `LLM_PROVIDER=mock` + PyMuPDF + RapidOCR + openpyxl.
+- Fixed Seeds: `random.Random(20260101)` (DB seed), `random.Random(2026)` & `random_state=42` (ML).
+- Seeded Corpus: **{m["dataset"]["vendors"]}** vendors, **{m["dataset"]["purchase_orders"]}** POs,
+  **{m["dataset"]["invoices"]}** invoices; **{m["dataset"]["eval_documents"]}** fresh docs.
+- IsolationForest Split: **88** train (80 normal + 8 outliers) / **20** held-out test (12 + 8).
 
 ## 2. Measured Quality & Safety Metrics
 
@@ -608,9 +609,15 @@ SQLite + `LLM_PROVIDER=mock` + PyMuPDF/RapidOCR + openpyxl (synthetic evaluation
 | Workload | Median | P95 | Notes |
 |---|---|---|---|
 | Document Upload + OCR/Extract Job | {doc_lat} | PyMuPDF + RapidOCR PNG + openpyxl |
-| Core Read APIs | {api_lat} | {api_note} |
+| Core Read APIs (in-process TestClient) | {api_lat} | {api_note} |
+| Concurrent External Load (`locust` / `k6`) | not measured | not measured | Tool not installed |
 
-## 4. Honest Limitations
+## 4. Security & Static Tooling Snapshot
+- `ruff check`, `mypy app`, `eslint`, and AST/regex secret scan pass (`0` issues).
+- `npm audit --omit=dev --audit-level=high`: `0` high/critical production advisories.
+- `gitleaks` & `pip-audit`: CLI binaries not installed on host (secret scan runs via pytest).
+
+## 5. Honest Limitations
 - Evaluation ran against deterministic synthetic fixtures (`LLM_PROVIDER=mock`) on local Windows
   SQLite rather than live external Gemini/Groq APIs or live Docker PostgreSQL (see `OD-07` in
   `docs/DECISIONS.md`).

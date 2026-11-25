@@ -1,13 +1,14 @@
 # ReconX AI — Measured Evaluation Report
 
-Generated automatically by `backend/scripts/run_evaluation.py` at `2026-11-25T16:18:31.083372+00:00` on
+Generated automatically by `backend/scripts/run_evaluation.py` at `2026-11-25T16:52:02.017378+00:00` on
 SQLite + `LLM_PROVIDER=mock` + PyMuPDF/RapidOCR + openpyxl (synthetic evaluation corpus only).
 
-## 1. Corpus Summary
-- Seeded Vendors: **8**
-- Seeded Purchase Orders: **40**
-- Seeded Invoices: **42**
-- Fresh Extraction Benchmark Documents: **6**
+## 1. Environment & Corpus Summary
+- Environment: Windows + Python 3.13 + SQLite + `LLM_PROVIDER=mock` + PyMuPDF + RapidOCR + openpyxl.
+- Fixed Seeds: `random.Random(20260101)` (DB seed), `random.Random(2026)` & `random_state=42` (ML).
+- Seeded Corpus: **8** vendors, **40** POs,
+  **42** invoices; **6** fresh docs.
+- IsolationForest Split: **88** train (80 normal + 8 outliers) / **20** held-out test (12 + 8).
 
 ## 2. Measured Quality & Safety Metrics
 
@@ -23,10 +24,16 @@ SQLite + `LLM_PROVIDER=mock` + PyMuPDF/RapidOCR + openpyxl (synthetic evaluation
 
 | Workload | Median | P95 | Notes |
 |---|---|---|---|
-| Document Upload + OCR/Extract Job | **131.66 ms** | **5426.12 ms** | PyMuPDF + RapidOCR PNG + openpyxl |
-| Core Read APIs | **38.18 ms** | **53.92 ms** | NFR-PERF-01 < 2000 ms P95 (60 reqs) |
+| Document Upload + OCR/Extract Job | **65.32 ms** | **2383.79 ms** | PyMuPDF + RapidOCR PNG + openpyxl |
+| Core Read APIs (in-process TestClient) | **15.8 ms** | **19.04 ms** | NFR-PERF-01 < 2000 ms P95 (60 reqs) |
+| Concurrent External Load (`locust` / `k6`) | not measured | not measured | Tool not installed |
 
-## 4. Honest Limitations
+## 4. Security & Static Tooling Snapshot
+- `ruff check`, `mypy app`, `eslint`, and AST/regex secret scan pass (`0` issues).
+- `npm audit --omit=dev --audit-level=high`: `0` high/critical production advisories.
+- `gitleaks` & `pip-audit`: CLI binaries not installed on host (secret scan runs via pytest).
+
+## 5. Honest Limitations
 - Evaluation ran against deterministic synthetic fixtures (`LLM_PROVIDER=mock`) on local Windows
   SQLite rather than live external Gemini/Groq APIs or live Docker PostgreSQL (see `OD-07` in
   `docs/DECISIONS.md`).
