@@ -10,7 +10,7 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | FR-AUTH-01 | P0 | `backend/app/api/v1/auth.py`, `core/security.py` | `POST /api/v1/auth/login`, `/refresh`, `/logout` | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
 | FR-AUTH-02 | P0 | `backend/app/core/permissions.py` | All protected `/api/v1/*` routes | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
 | FR-AUTH-03 | P0 | `backend/app/models/auth.py` | `GET /api/v1/auth/me`, `POST /api/v1/admin/users` | `backend/tests/test_auth_rbac.py` | IMPLEMENTED |
-| FR-AUTH-04 | P1 | `backend/app/services/workflows/` | `POST /api/v1/exceptions/{id}/decision`, `PUT /api/v1/admin/config` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
+| FR-AUTH-04 | P1 | `backend/app/services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision`, `PUT /api/v1/admin/config` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
 | FR-AUTH-05 | P0 | `backend/app/services/audit/` | All mutating `/api/v1/*` routes | `backend/tests/test_audit.py` | IMPLEMENTED |
 | FR-CFG-01 | P0 | `backend/app/api/v1/admin.py`, `models/config.py` | `GET/PUT /api/v1/admin/config`, `/tolerances` | `backend/tests/test_admin_config.py`, `test_domain_records.py` | IMPLEMENTED |
 | FR-CFG-02 | P1 | `backend/app/models/config.py`, `services/audit/` | `PUT /api/v1/admin/config`, `GET /api/v1/audit` | `backend/tests/test_admin_config.py` | IMPLEMENTED |
@@ -40,44 +40,44 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | FR-MAT-09 | P0 | `backend/app/services/reconciliation/engine.py`, `services/workflows/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
 | FR-EXC-01 | P0 | `backend/app/services/exceptions/` | `GET /api/v1/exceptions` | `backend/tests/test_reconciliation_api.py` | IMPLEMENTED |
 | FR-EXC-02 | P0 | `backend/app/models/exception.py` | `GET /api/v1/exceptions/{id}` | `backend/tests/test_reconciliation_api.py` | IMPLEMENTED |
-| FR-EXC-03 | P1 | `backend/app/services/agents/investigator.py` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_investigation_agent.py` | NOT_STARTED |
-| FR-EXC-04 | P1 | `backend/app/services/agents/investigator.py` | `GET /api/v1/investigations/{id}` | `backend/tests/test_investigation_agent.py` | NOT_STARTED |
-| FR-EXC-05 | P1 | `backend/app/services/agents/schemas.py` | `GET /api/v1/investigations/{id}` | `backend/tests/test_investigation_agent.py` | NOT_STARTED |
-| FR-EXC-06 | P0 | `backend/app/services/agents/validator.py` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_investigation_agent.py` | NOT_STARTED |
-| FR-EXC-07 | P0 | `backend/app/services/agents/tools.py` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_security_agent.py` | NOT_STARTED |
-| FR-EXC-08 | P0 | `backend/app/api/v1/exceptions.py` | `POST /api/v1/exceptions/{id}/assign`, `/comments`, `/decision` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
-| FR-EXC-09 | P0 | `backend/app/services/agents/tools.py`, `services/audit/` | `GET /api/v1/audit` | `backend/tests/test_investigation_agent.py` | NOT_STARTED |
+| FR-EXC-03 | P1 | `backend/app/services/agents/investigator.py` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-EXC-04 | P1 | `backend/app/services/agents/investigator.py` | `GET /api/v1/investigations/{id}` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-EXC-05 | P1 | `backend/app/services/agents/investigator.py` | `GET /api/v1/investigations/{id}` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-EXC-06 | P0 | `backend/app/services/agents/investigator.py` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-EXC-07 | P0 | `backend/app/services/agents/tools.py` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-EXC-08 | P0 | `backend/app/api/v1/exceptions.py` | `POST /api/v1/exceptions/{id}/assign`, `/comments`, `/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
+| FR-EXC-09 | P0 | `backend/app/services/agents/tools.py`, `services/audit/` | `GET /api/v1/audit` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
 | FR-RISK-01 | P0 | `backend/app/services/reconciliation/rules.py`, `services/risk/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
-| FR-RISK-02 | P1 | `backend/app/services/risk/duplicates.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_risk_service.py` | NOT_STARTED |
-| FR-RISK-03 | P1 | `backend/app/services/risk/price_anomaly.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_risk_service.py` | NOT_STARTED |
-| FR-RISK-04 | P1 | `backend/app/services/risk/vendor_patterns.py` | `GET /api/v1/vendors/{id}` | `backend/tests/test_risk_service.py` | NOT_STARTED |
-| FR-RISK-05 | P1 | `backend/app/models/risk.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_risk_service.py` | NOT_STARTED |
-| FR-RISK-06 | P0 | `backend/app/services/risk/`, `frontend/src/components/` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_risk_service.py` | NOT_STARTED |
-| FR-RISK-07 | P0 | `backend/app/services/risk/ml_anomaly.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_risk_service.py` | NOT_STARTED |
-| FR-RISK-08 | P0 | `backend/app/services/risk/`, `services/workflows/` | `POST /api/v1/vendors/{id}/bank-change` | `backend/tests/test_risk_service.py` | NOT_STARTED |
-| FR-VEN-01 | P1 | `backend/app/services/vendors/` | `GET /api/v1/vendors/{id}/profile` | `backend/tests/test_vendors.py` | NOT_STARTED |
-| FR-VEN-02 | P1 | `backend/app/services/vendors/` | `GET /api/v1/vendors/{id}/profile` | `backend/tests/test_vendors.py` | NOT_STARTED |
-| FR-VEN-03 | P2 | `backend/app/services/vendors/` | `GET /api/v1/vendors/{id}/profile` | `backend/tests/test_vendors.py` | NOT_STARTED |
-| FR-VEN-04 | P0 | `backend/app/services/vendors/` | `GET /api/v1/vendors/{id}/profile` | `backend/tests/test_vendors.py` | NOT_STARTED |
-| FR-WF-01 | P0 | `backend/app/services/workflows/state_machine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
-| FR-WF-02 | P0 | `backend/app/api/v1/exceptions.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
-| FR-WF-03 | P0 | `backend/app/services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
-| FR-WF-04 | P1 | `backend/app/services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
-| FR-WF-05 | P0 | `backend/app/models/approval.py`, `services/audit/` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
-| FR-WF-06 | P0 | `backend/app/services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
+| FR-RISK-02 | P1 | `backend/app/services/risk/engine.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-RISK-03 | P1 | `backend/app/services/risk/engine.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-RISK-04 | P1 | `backend/app/services/risk/engine.py` | `GET /api/v1/vendors/{id}/profile` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-RISK-05 | P1 | `backend/app/models/domain.py`, `services/risk/engine.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-RISK-06 | P0 | `backend/app/services/risk/engine.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-RISK-07 | P0 | `backend/app/services/risk/engine.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-RISK-08 | P0 | `backend/app/services/risk/engine.py`, `api/v1/intelligence.py` | `POST /api/v1/vendors/{id}/bank-change` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-VEN-01 | P1 | `backend/app/services/risk/engine.py` | `GET /api/v1/vendors/{id}/profile` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-VEN-02 | P1 | `backend/app/services/risk/engine.py` | `GET /api/v1/vendors/{id}/profile` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-VEN-03 | P2 | `backend/app/services/risk/engine.py` | `GET /api/v1/vendors/{id}/profile` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-VEN-04 | P0 | `backend/app/services/risk/engine.py` | `GET /api/v1/vendors/{id}/profile` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-WF-01 | P0 | `backend/app/services/workflows/state_machine.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
+| FR-WF-02 | P0 | `backend/app/api/v1/exceptions.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
+| FR-WF-03 | P0 | `backend/app/services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
+| FR-WF-04 | P1 | `backend/app/services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
+| FR-WF-05 | P0 | `backend/app/models/domain.py`, `services/audit/` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
+| FR-WF-06 | P0 | `backend/app/services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
 | FR-UI-01 | P0 | `frontend/src/pages/DashboardPage.tsx`, `api/v1/dashboard.py` | `GET /api/v1/dashboard/summary` | `frontend/src/__tests__/Dashboard.test.tsx` | NOT_STARTED |
 | FR-UI-02 | P0 | `frontend/src/pages/TransactionsPage.tsx`, `api/v1/transactions.py` | `GET /api/v1/transactions` | `frontend/e2e/smoke.spec.ts` | NOT_STARTED |
 | FR-UI-03 | P0 | `frontend/src/pages/TransactionDetailPage.tsx` | `GET /api/v1/transactions/{id}` | `frontend/src/__tests__/DiffTable.test.tsx` | NOT_STARTED |
-| FR-UI-04 | P1 | `frontend/src/pages/CashViewPage.tsx`, `api/v1/analytics.py` | `GET /api/v1/analytics/cash-obligations` | `backend/tests/test_p2_features.py` | NOT_STARTED |
-| FR-UI-05 | P1 | `backend/app/services/agents/copilot.py`, `api/v1/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_p2_features.py` | NOT_STARTED |
-| FR-UI-06 | P1 | `backend/app/services/agents/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_p2_features.py` | NOT_STARTED |
-| FR-UI-07 | P0 | `backend/app/services/agents/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_p2_features.py` | NOT_STARTED |
-| FR-UI-08 | P1 | `backend/app/api/v1/reports.py` | `GET /api/v1/reports/export` | `backend/tests/test_p2_features.py` | NOT_STARTED |
+| FR-UI-04 | P1 | `backend/app/api/v1/intelligence.py` | `GET /api/v1/analytics/cash-obligations` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-UI-05 | P1 | `backend/app/services/agents/copilot.py`, `api/v1/intelligence.py` | `POST /api/v1/copilot/query` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-UI-06 | P1 | `backend/app/services/agents/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-UI-07 | P0 | `backend/app/services/agents/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| FR-UI-08 | P1 | `backend/app/api/v1/intelligence.py` | `GET /api/v1/reports/export` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
 | FR-AUD-01 | P0 | `backend/app/services/audit/service.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
 | FR-AUD-02 | P0 | `backend/app/models/audit.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
 | FR-AUD-03 | P0 | `backend/migrations/` (DB trigger) | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
-| FR-NOT-01 | P1 | `backend/app/services/notifications/` | `GET /api/v1/notifications` | `backend/tests/test_notifications.py` | NOT_STARTED |
-| FR-NOT-02 | P0 | `backend/app/services/notifications/` | `GET /api/v1/notifications` | `backend/tests/test_notifications.py` | NOT_STARTED |
+| FR-NOT-01 | P1 | `backend/app/services/workflows/approval.py`, `api/v1/exceptions.py` | `GET /api/v1/notifications` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
+| FR-NOT-02 | P0 | `backend/app/services/workflows/approval.py`, `api/v1/exceptions.py` | `GET /api/v1/notifications` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
 
 ## Non-Functional Requirements (NFR)
 
@@ -109,8 +109,8 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | AT-05 | P0 | `services/reconciliation/`, `services/risk/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
 | AT-06 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
 | AT-07 | P0 | `services/documents/` | `GET /api/v1/documents/{id}`, `POST /api/v1/documents/{id}/verify` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
-| AT-08 | P0 | `services/agents/` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| AT-09 | P0 | `api/v1/exceptions.py`, `core/permissions.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| AT-10 | P0 | `services/graph/`, `services/reconciliation/` | `GET /api/v1/graph/transactions/{id}`, `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| AT-11 | P0 | `services/agents/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| AT-12 | P0 | `services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_acceptance.py` | NOT_STARTED |
+| AT-08 | P0 | `services/agents/` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| AT-09 | P0 | `api/v1/exceptions.py`, `core/permissions.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
+| AT-10 | P0 | `services/graph/`, `services/reconciliation/` | `GET /api/v1/graph/transactions/{id}`, `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| AT-11 | P0 | `services/agents/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
+| AT-12 | P0 | `services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
