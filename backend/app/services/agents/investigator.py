@@ -9,6 +9,11 @@ from app.core.exceptions import AppError
 from app.core.permissions import CurrentUserContext
 from app.models.domain import Document, ExceptionCase, GoodsReceipt, Invoice, PurchaseOrder
 from app.repositories.base import OrgScopedRepository
+from app.services.agents.orchestrator import (
+    AgentStepTrace,
+    FinanceOrchestrator,
+    OrchestrationContext,
+)
 from app.services.agents.tools import AgentToolbox
 from app.services.llm.adapter import get_llm_provider, wrap_untrusted_text
 
@@ -113,12 +118,13 @@ def run_case_investigation(
         raise AppError("CASE_NOT_FOUND", "Exception case not found.", status.HTTP_404_NOT_FOUND)
 
     toolbox = AgentToolbox(db, current_user)
-    bundle = toolbox.get_transaction_bundle(case.transaction_id)
-    vendor_id_str = (bundle.get("vendor") or {}).get("id")
-    vendor_history = (
-        toolbox.get_vendor_history(UUID(vendor_id_str)) if vendor_id_str else {}
+    orchestrator = FinanceOrchestrator()
+    ctx = orchestrator.run_pipeline(
+        OrchestrationContext(db=db, current_user=current_user, case=case, toolbox=toolbox)
     )
-    risks = toolbox.evaluate_risks(case.transaction_id)
+    bundle = ctx.bundle
+    vendor_history = ctx.vendor_history
+    risks = ctx.risks
 
     # Build grounded facts & real evidence references ONLY from retrieved DB records
     facts: list[str] = [
@@ -158,13 +164,21 @@ def run_case_investigation(
             EvidenceRefItem(type="invoice", id=inv["id"], label=inv["invoice_number"])
         )
 
-    missing_info: list[str] = []
-    if not po:
-        missing_info.append("No linked Purchase Order found for this transaction.")
-    if not grns:
-        missing_info.append("No Goods Receipt Note (GRN) recorded against this PO.")
-    if not invs:
-        missing_info.append("No Supplier Invoice linked to this PO.")
+    hist_pos = [
+        n["label"] for n in ctx.graph_context.get("nodes", []) if n.get("type") == "HistoricalPO"
+    ]
+    if hist_pos:
+        facts.append(
+            f"Evidence graph linked {len(hist_pos)} historical vendor PO(s): "
+            + ", ".join(hist_pos[:5])
+        )
+
+    missing_info: list[str] = list(ctx.matching_findings.get("missing_information") or [])
+    if ctx.document_findings.get("needs_review_files"):
+        missing_info.append(
+            "Low-confidence document(s) pending human verification: "
+            + ", ".join(ctx.document_findings["needs_review_files"])
+        )
 
     hypotheses = [
         f"Hypothesis (unverified): {case.type} may reflect a partial shipment or supplier "
@@ -226,8 +240,26 @@ def run_case_investigation(
         ai_assisted=True,
     )
 
+    ctx.execution_trace.append(
+        AgentStepTrace(
+            agent="InvestigationAgent",
+            status="SUCCEEDED",
+            duration_ms=0.0,
+            summary=f"Synthesized {len(facts)} facts and {len(evidence_refs)} verified refs.",
+        )
+    )
+    ctx.execution_trace.append(
+        AgentStepTrace(
+            agent="AuditAgent",
+            status="SUCCEEDED",
+            duration_ms=0.0,
+            summary=f"Recorded {len(toolbox.tool_trace)} audited tool call(s).",
+        )
+    )
+
     output_dict = structured.model_dump()
     output_dict["tool_trace"] = toolbox.tool_trace
+    output_dict["execution_trace"] = [step.to_dict() for step in ctx.execution_trace]
     inv_row = toolbox.create_investigation_draft(
         case_id=case.id,
         structured_findings=output_dict,
