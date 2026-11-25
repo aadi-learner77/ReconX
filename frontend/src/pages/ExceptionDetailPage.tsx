@@ -193,8 +193,17 @@ export const ExceptionDetailPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
-                  <strong>Recommended Next Action:</strong> {latestInv.recommended_action}
+                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-1">
+                  <div>
+                    <strong>Recommended Next Action:</strong> {latestInv.recommended_action}
+                  </div>
+                  <div className="text-[11px] font-semibold">
+                    {latestInv.actual_provider === "gemini" && !latestInv.fallback_used
+                      ? "Generated with Google Gemini"
+                      : latestInv.fallback_used
+                        ? "Mock fallback used — not Gemini-generated."
+                        : `Provider: ${latestInv.actual_provider || exc.investigations[0]?.model_provider || "mock"}`}
+                  </div>
                 </div>
               </div>
             )}

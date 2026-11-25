@@ -135,6 +135,15 @@ export const api = {
       source: string;
     }>(`/graph/obligations/${id}`),
   getAgentHarnessOverview: () => request<any>("/intelligence/agent-harness"),
+  testGeminiConnection: () =>
+    request<{
+      connected: boolean;
+      configured_provider: string;
+      model: string;
+      latency_ms: number;
+      error_category: string;
+      message: string;
+    }>("/intelligence/gemini/test", { method: "POST" }),
   getTransactionRisk: (id: string) =>
     request<{ transaction_id: string; disclaimer: string; signals: any[] }>(`/transactions/${id}/risk`),
   listExceptions: (statusFilter = "") =>

@@ -59,6 +59,14 @@ export interface DashboardSummary {
     actor_type: string;
     timestamp: string;
   }[];
+  ai_status?: {
+    configured_provider: string;
+    gemini_model: string;
+    api_key_configured: boolean;
+    last_successful_provider: string | null;
+    successful_calls: number;
+    fallback_count: number;
+  };
 }
 
 export interface ExtractedFieldItem {

@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import ReactFlow, { Background, Controls, MarkerType, type Edge, type Node } from "reactflow";
 import "reactflow/dist/style.css";
-import { Cpu, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Cpu, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
 import { api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import { StatusBadge } from "../components/StatusBadge";
 
 const CATEGORY_STYLE: Record<string, { bg: string; border: string; color: string }> = {
@@ -19,18 +20,31 @@ const CATEGORY_STYLE: Record<string, { bg: string; border: string; color: string
 };
 
 export const AgentHarnessPage: React.FC = () => {
-  const { data, isLoading, error } = useQuery({
+  const { hasPermission } = useAuth();
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["agent-harness"],
     queryFn: api.getAgentHarnessOverview,
   });
 
   const [selectedAgentId, setSelectedAgentId] = useState<string>("DocumentAgent");
   const [selectedTraceId, setSelectedTraceId] = useState<string>("");
+  const [testResult, setTestResult] = useState<any | null>(null);
+
+  const testGeminiMut = useMutation({
+    mutationFn: api.testGeminiConnection,
+    onSuccess: (res) => {
+      setTestResult(res);
+      refetch();
+    },
+    onError: (e: any) =>
+      setTestResult({ connected: false, error_category: "REQUEST_ERROR", message: e.message }),
+  });
 
   const agents: any[] = data?.configured_agents || [];
   const traces: any[] = data?.recent_traces || [];
   const harnessComponents: any[] = data?.harness_components || [];
   const sys = data?.system_status;
+  const gtel = data?.gemini_telemetry;
 
   const activeTrace = useMemo(() => {
     if (!traces.length) return null;
@@ -138,6 +152,105 @@ export const AgentHarnessPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Google Gemini Integration Showcase */}
+      {gtel && (
+        <div className="bg-white border border-indigo-200 rounded-xl p-5 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-indigo-600">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI assistance powered by Google Gemini API</span>
+              </div>
+              <h2 className="text-lg font-bold text-slate-900 mt-0.5">
+                Google Gemini Integration
+              </h2>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Document Evidence → Deterministic Finance Engine → Gemini-assisted Investigation →
+                Evidence Validation → Human Approval
+              </p>
+            </div>
+            {hasPermission("admin:config:write") && (
+              <button
+                type="button"
+                onClick={() => testGeminiMut.mutate()}
+                disabled={testGeminiMut.isPending}
+                className="px-3.5 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {testGeminiMut.isPending ? "Testing Gemini..." : "Test Gemini Connection"}
+              </button>
+            )}
+          </div>
+
+          {testResult && (
+            <div
+              className={`p-3 rounded-lg border text-xs ${
+                testResult.connected
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                  : "bg-amber-50 border-amber-200 text-amber-900"
+              }`}
+            >
+              <strong>{testResult.connected ? "Connected" : "Connection Failed"}:</strong>{" "}
+              {testResult.message} (Model: {testResult.model || gtel.gemini_model}, Latency:{" "}
+              {testResult.latency_ms ?? 0} ms, Category: {testResult.error_category})
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs">
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="text-slate-500">Gemini Model</div>
+              <div className="font-bold text-slate-900 truncate">{gtel.gemini_model}</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="text-slate-500">Configured / Key</div>
+              <div className="font-bold text-slate-900 uppercase">
+                {gtel.configured_provider} ({gtel.api_key_configured ? "Key Set" : "No Key"})
+              </div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="text-slate-500">Invocations</div>
+              <div className="font-bold text-slate-900">{gtel.invocation_count}</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="text-slate-500">Succeeded</div>
+              <div className="font-bold text-emerald-700">{gtel.successful_calls}</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="text-slate-500">Failed / Fallback</div>
+              <div className="font-bold text-amber-700">
+                {gtel.failed_calls} / {gtel.fallback_count}
+              </div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="text-slate-500">Avg Latency</div>
+              <div className="font-bold text-slate-900">{gtel.avg_latency_ms} ms</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="text-slate-500">Token Usage</div>
+              <div className="font-semibold text-slate-600">Unavailable</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="p-3 rounded-lg bg-indigo-50/50 border border-indigo-100">
+              <div className="font-bold text-indigo-900 mb-1">Where Gemini Assists</div>
+              <ul className="list-disc pl-4 text-slate-700 space-y-0.5">
+                <li>Natural-language investigation summaries over DB-verified facts</li>
+                <li>Contextual interpretation of discrepancies and vendor history</li>
+                <li>Clearly labeled unverified hypotheses and recommended next steps</li>
+              </ul>
+            </div>
+            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+              <div className="font-bold text-slate-900 mb-1">What Gemini Never Does</div>
+              <ul className="list-disc pl-4 text-slate-700 space-y-0.5">
+                <li>Never calculates authoritative totals or overrides 3-way matching</li>
+                <li>Never creates unvalidated evidence refs, approves invoices, or pays</li>
+                <li>Never bypasses RBAC, maker-checker, or audit immutability</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Section 2: Interactive Agent Architecture + Right Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -291,8 +404,18 @@ export const AgentHarnessPage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-3 text-xs">
               <StatusBadge value={activeTrace.status} />
               <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 font-semibold uppercase">
-                Provider: {activeTrace.model_provider} ({activeTrace.model_name})
+                Actual Provider: {activeTrace.actual_provider || activeTrace.model_provider} (
+                {activeTrace.model_name})
               </span>
+              {activeTrace.actual_provider === "gemini" && !activeTrace.fallback_used ? (
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">
+                  Generated with Google Gemini
+                </span>
+              ) : activeTrace.fallback_used ? (
+                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">
+                  Mock fallback used — not Gemini-generated.
+                </span>
+              ) : null}
               <span className="text-slate-600">
                 Confidence: {(activeTrace.confidence * 100).toFixed(0)}%
               </span>

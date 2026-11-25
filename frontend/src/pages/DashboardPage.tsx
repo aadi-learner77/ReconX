@@ -114,6 +114,36 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
+            AI assistance powered by Google Gemini API
+          </div>
+          <h2 className="text-base font-bold text-slate-900 mt-0.5">
+            Gemini-Powered Financial Intelligence
+          </h2>
+          <p className="text-xs text-slate-600 mt-0.5 max-w-2xl">
+            Google Gemini API assists ReconX in contextual financial investigation while
+            deterministic reconciliation and evidence validation preserve financial correctness.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <div className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+            Provider:{" "}
+            <strong className="uppercase text-indigo-700">
+              {data.ai_status?.configured_provider || "mock"}
+            </strong>{" "}
+            ({data.ai_status?.gemini_model || "gemini-2.5-flash"})
+          </div>
+          <Link
+            to="/agent-harness"
+            className="px-3.5 py-2 rounded-lg border border-indigo-300 text-indigo-700 font-semibold hover:bg-indigo-50"
+          >
+            Open Agent Harness →
+          </Link>
+        </div>
+      </div>
+
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900 mb-3">Recent Audit Activity</h2>
         <div className="overflow-x-auto">
