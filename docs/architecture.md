@@ -15,8 +15,8 @@ flowchart LR
         API --> DOC["Document Ingestion & Validation"]
         API --> RECON["Deterministic 3-Way Match Engine (decimal.Decimal ONLY)"]
         API --> WF["Exception Workflow, Maker-Checker & Approvals"]
-        API --> RISK["Risk Indicators & IsolationForest (Non-blocking)"]
-        API --> AGENT["Investigation Agent & Read-Only Copilot"]
+        API --> RISK["Risk Indicators & IsolationForest (Split-Invoice, Shared Bank, MAD)"]
+        API --> AGENT["FinanceOrchestrator (Document, Matching, Risk, Vendor, Investigation, Audit Agents) & Copilot"]
         API --> AUDIT["Immutable Audit Trail"]
         WORKER["In-Process DB Job Worker Thread"]
     end
@@ -27,6 +27,8 @@ flowchart LR
     AGENT -->|"<<<UNTRUSTED_DOCUMENT_CONTENT>>>"| LLM["LLMProvider Adapter (mock / gemini / groq / ollama)"]
     Core --> DB[("PostgreSQL / SQLite (NUMERIC(18,4) + Append-Only Audit Triggers)")]
 ```
+
+- **Frontend Views:** Includes `AgentHarnessPage` (`/agent-harness`) for 7-stage orchestration & live trace inspection, and `ObligationGraphPage` (`/obligation-graph`) with `Obligation View` + `Evidence View` over the same PostgreSQL/SQLite source of truth.
 
 ## 2. Trust Boundaries & Financial Guarantees
 

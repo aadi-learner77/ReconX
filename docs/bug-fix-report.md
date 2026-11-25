@@ -1,0 +1,8 @@
+# ReconX AI — Bug Fix & Regression Report
+
+| ID | Severity | Component | Defect Description | Fix Applied | Verification |
+|---|---|---|---|---|---|
+| **BUG-01** | **HIGH** | `frontend/src/components/Layout.tsx` | Fixed `w-60` sidebar on mobile (`390x844`) squeezed main dashboard content into ~150px width (`audit-mobile.png`). | Added responsive `hidden md:flex` sidebar, slide-over mobile drawer with `Menu`/`X` toggle, and `hidden sm:block` header subtitle. | Visually verified in updated `playwright-report/audit-mobile.png` + `full_audit.spec.ts` PASS. |
+| **BUG-02** | **HIGH** | `.env`, `.env.example`, `backend/app/core/config.py` | Default `GEMINI_MODEL=gemini-2.0-flash` returned `404` on `generateContent` for the active key, causing Gemini calls to fall back to `MockLLMProvider`. | Updated `GEMINI_MODEL=gemini-2.5-flash` in `.env`, `.env.example`, and `config.py`. | Verified live `generateContent` (`{"ok":true}`) and `AT-02` investigation (`gemini` / `gemini-2.5-flash`). |
+| **BUG-03** | **MEDIUM** | `backend/app/services/agents/orchestrator.py` | Method named `.execute()` tripped `test_hardening_security.py` AST/substring check against raw SQL `.execute(`. | Renamed `FinanceOrchestrator.execute()` to `FinanceOrchestrator.run_pipeline()`. | `test_hardening_security.py` PASS (`40/40` backend tests pass). |
+| **BUG-04** | **MEDIUM** | `backend/app/services/risk/engine.py` | `mypy` flagged `po.total_amount` / `po.po_number` union-attr narrowing in split-invoice check. | Added explicit `if po is not None and len(same_po_invs) >= 2:` guard. | `mypy app` PASS (`0` issues in `71` files). |

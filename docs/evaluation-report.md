@@ -1,6 +1,6 @@
 # ReconX AI — Measured Evaluation Report
 
-Generated automatically by `backend/scripts/run_evaluation.py` at `2026-11-25T16:52:02.017378+00:00` on
+Generated automatically by `backend/scripts/run_evaluation.py` at `2026-11-25T18:24:29.601901+00:00` on
 SQLite + `LLM_PROVIDER=mock` + PyMuPDF/RapidOCR + openpyxl (synthetic evaluation corpus only).
 
 ## 1. Environment & Corpus Summary
@@ -24,8 +24,8 @@ SQLite + `LLM_PROVIDER=mock` + PyMuPDF/RapidOCR + openpyxl (synthetic evaluation
 
 | Workload | Median | P95 | Notes |
 |---|---|---|---|
-| Document Upload + OCR/Extract Job | **65.32 ms** | **2383.79 ms** | PyMuPDF + RapidOCR PNG + openpyxl |
-| Core Read APIs (in-process TestClient) | **15.8 ms** | **19.04 ms** | NFR-PERF-01 < 2000 ms P95 (60 reqs) |
+| Document Upload + OCR/Extract Job | **228.53 ms** | **13085.59 ms** | PyMuPDF + RapidOCR PNG + openpyxl |
+| Core Read APIs (in-process TestClient) | **52.39 ms** | **68.8 ms** | NFR-PERF-01 < 2000 ms P95 (60 reqs) |
 | Concurrent External Load (`locust` / `k6`) | not measured | not measured | Tool not installed |
 
 ## 4. Security & Static Tooling Snapshot
