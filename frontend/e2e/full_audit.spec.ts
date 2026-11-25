@@ -122,6 +122,18 @@ test("full website audit across all routes, workflows, RBAC, and viewports", asy
   await expect(page.locator("h1").first()).toBeVisible();
   await page.screenshot({ path: "playwright-report/audit-admin.png", fullPage: true });
 
+  // 7b. Policy Studio (/policy-studio) & Executive Brief (/executive-brief)
+  await page.click('a[href="/policy-studio"]');
+  await expect(page.getByRole("heading", { name: "Policy Studio" })).toBeVisible();
+  await expect(page.getByText("POL-SYS-DUP")).toBeVisible({ timeout: 10000 });
+  await page.screenshot({ path: "playwright-report/audit-policy-studio.png", fullPage: true });
+
+  await page.click('a[href="/executive-brief"]');
+  await expect(page.getByRole("heading", { name: "Executive Boardroom Brief" })).toBeVisible();
+  await page.click('button:has-text("Generate Executive Brief")');
+  await expect(page.getByText("Top Three Urgent Exceptions")).toBeVisible({ timeout: 10000 });
+  await page.screenshot({ path: "playwright-report/audit-executive-brief.png", fullPage: true });
+
   // 8. Mobile viewport check (390x844)
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");

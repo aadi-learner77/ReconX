@@ -697,6 +697,71 @@ def seed_synthetic_dataset(db: Session, *, reset: bool = False) -> dict[str, str
     db.commit()
 
     # Compute deterministic checksum of seeded PO + GRN + Invoice totals for verification
+    from app.models.policy import Policy
+    from app.services.policies.engine import activate_policy, create_policy
+
+    if not db.scalar(
+        select(Policy).where(Policy.organization_id == org.id, Policy.policy_key == "POL-SYS-DUP")
+    ):
+        p1, _ = create_policy(
+            db,
+            organization_id=org.id,
+            actor_id="system_seed",
+            policy_key="POL-SYS-DUP",
+            name="Duplicate Invoice Review Gate",
+            description=(
+                "Flags transactions where an invoice matches an existing duplicate fingerprint."
+            ),
+            category="DUPLICATE",
+            severity="CRITICAL",
+            is_system_policy=True,
+            definition_dict={
+                "scope": {"document_types": ["INVOICE"]},
+                "condition": {
+                    "field": "invoice.is_duplicate",
+                    "operator": "eq",
+                    "value": True,
+                },
+                "action": {
+                    "type": "CREATE_EXCEPTION",
+                    "exception_type": "POLICY_DUPLICATE_GATE",
+                    "instructions": "Verify invoice uniqueness before approval.",
+                },
+            },
+            change_summary="Seeded system duplicate policy",
+        )
+        activate_policy(db, organization_id=org.id, policy_id=p1.id, actor_id="system_seed")
+
+    if not db.scalar(
+        select(Policy).where(
+            Policy.organization_id == org.id, Policy.policy_key == "POL-CUSTOM-QTY"
+        )
+    ):
+        create_policy(
+            db,
+            organization_id=org.id,
+            actor_id="system_seed",
+            policy_key="POL-CUSTOM-QTY",
+            name="Critical Quantity Variance (>5 EA)",
+            description="Flags invoices exceeding accepted GRN quantity by more than 5 units.",
+            category="FINANCIAL",
+            severity="HIGH",
+            definition_dict={
+                "scope": {"document_types": ["PURCHASE_ORDER", "GOODS_RECEIPT", "INVOICE"]},
+                "condition": {
+                    "field": "variance.qty_diff",
+                    "operator": "gt",
+                    "value": "5",
+                },
+                "action": {
+                    "type": "CREATE_EXCEPTION",
+                    "exception_type": "POLICY_QTY_VARIANCE",
+                    "instructions": "Confirm short-receipt or credit note with warehouse.",
+                },
+            },
+            change_summary="Seeded draft policy for Donut Challenge 1 demo",
+        )
+
     po_rows = list(
         db.scalars(
             select(PurchaseOrder)
