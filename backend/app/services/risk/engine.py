@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from statistics import median
 from typing import Any
@@ -94,6 +94,10 @@ def compute_vendor_profile(
             delta = (g.received_at.date() - po_map[g.po_id].issue_date).days
             lead_days.append(max(0, delta))
     avg_lead_days = round(sum(lead_days) / len(lead_days), 2) if lead_days else None
+    on_time_rate = (
+        round(sum(1 for d in lead_days if d <= 14) / len(lead_days), 4) if lead_days else None
+    )
+    price_variance_count = sum(1 for e in excs if e.rule_id == "R-PRC-01")
 
     bank_changes = list(
         db.scalars(
@@ -125,7 +129,9 @@ def compute_vendor_profile(
         "reconciliation_runs_count": len(runs),
         "mismatch_rate": mismatch_rate,
         "dispute_count": len(excs),
+        "price_variance_count": price_variance_count,
         "avg_delivery_days": avg_lead_days,
+        "on_time_delivery_rate": on_time_rate,
         "reliability_indicator": reliability_indicator,
         "small_sample_warning": (
             f"Sample size N={sample_n} is small (<5); no definitive vendor score computed."
@@ -318,6 +324,91 @@ def evaluate_transaction_risk(
                 "model_version": "rules-v1",
             }
         )
+
+    # 3b. Split-invoice pattern detection (multiple invoices in 7-day window)
+    if invoices:
+        anchor_inv = invoices[0]
+        window_start = anchor_inv.invoice_date - timedelta(days=7)
+        window_end = anchor_inv.invoice_date + timedelta(days=7)
+        nearby_vendor_invs = [
+            i
+            for i in all_org_invs
+            if i.vendor_id == vendor_id and window_start <= i.invoice_date <= window_end
+        ]
+        same_po_invs = (
+            [i for i in nearby_vendor_invs if i.po_id == po.id] if po is not None else []
+        )
+        if po is not None and len(same_po_invs) >= 2:
+            combined = sum((i.total_amount for i in same_po_invs), Decimal("0"))
+            if po.total_amount > 0 and combined >= po.total_amount * Decimal("0.90"):
+                signals.append(
+                    {
+                        "signal_type": "SPLIT_INVOICE_PATTERN",
+                        "severity": "MEDIUM",
+                        "score": Decimal("0.7200"),
+                        "reason_json": {
+                            "reason_codes": ["SPLIT_INVOICE_SAME_PO_WINDOW"],
+                            "contributing_signals": [
+                                f"{len(same_po_invs)} invoices against {po.po_number} "
+                                f"within 7 days (combined={combined} vs PO={po.total_amount})."
+                            ],
+                            "limited_confidence": False,
+                            "disclaimer": DISCLAIMER,
+                        },
+                        "model_version": "rules-v2",
+                    }
+                )
+        elif len(nearby_vendor_invs) >= 4:
+            signals.append(
+                {
+                    "signal_type": "ABNORMAL_INVOICE_FREQUENCY",
+                    "severity": "MEDIUM",
+                    "score": Decimal("0.6800"),
+                    "reason_json": {
+                        "reason_codes": ["HIGH_SHORT_WINDOW_INVOICE_FREQUENCY"],
+                        "contributing_signals": [
+                            f"Vendor submitted {len(nearby_vendor_invs)} invoices within +/-7 days."
+                        ],
+                        "limited_confidence": False,
+                        "disclaimer": DISCLAIMER,
+                    },
+                    "model_version": "rules-v2",
+                }
+            )
+
+    # 3c. Relationship anomaly: shared bank account across distinct vendors in org
+    current_vendor = OrgScopedRepository(db, Vendor, organization_id).get_by_id(vendor_id)
+    if current_vendor and current_vendor.bank_account_masked:
+        shared_vendors = [
+            v
+            for v in db.scalars(
+                OrgScopedRepository(db, Vendor, organization_id)
+                .base_query()
+                .where(
+                    Vendor.id != vendor_id,
+                    Vendor.bank_account_masked == current_vendor.bank_account_masked,
+                )
+            ).all()
+        ]
+        if shared_vendors:
+            names = ", ".join(v.legal_name for v in shared_vendors[:3])
+            signals.append(
+                {
+                    "signal_type": "SHARED_BANK_ACCOUNT",
+                    "severity": "HIGH",
+                    "score": Decimal("0.8800"),
+                    "reason_json": {
+                        "reason_codes": ["CROSS_VENDOR_SHARED_BANK_ACCOUNT"],
+                        "contributing_signals": [
+                            f"Masked bank account {current_vendor.bank_account_masked} "
+                            f"shared with distinct vendor(s): {names}."
+                        ],
+                        "limited_confidence": False,
+                        "disclaimer": DISCLAIMER,
+                    },
+                    "model_version": "graph-rel-v1",
+                }
+            )
 
     # 4. Optional IsolationForest anomaly check (FR-RISK-07: fallback/limited when thin)
     settings = get_settings()

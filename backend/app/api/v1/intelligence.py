@@ -33,7 +33,11 @@ from app.repositories.base import OrgScopedRepository
 from app.services.agents.copilot import answer_copilot_query
 from app.services.agents.investigator import run_case_investigation
 from app.services.audit.service import record_audit_event
-from app.services.graph.builder import build_transaction_evidence_graph
+from app.services.graph.builder import (
+    build_transaction_evidence_graph,
+    build_transaction_obligation_graph,
+    rebuild_transaction_evidence_graph,
+)
 from app.services.risk.engine import compute_vendor_profile, evaluate_transaction_risk
 
 router = APIRouter(tags=["intelligence"])
@@ -285,6 +289,7 @@ def get_dashboard_summary(
 @router.get("/graph/transactions/{transaction_id}")
 def get_transaction_graph(
     transaction_id: UUID,
+    include_history: bool = Query(default=True),
     current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -296,8 +301,266 @@ def get_transaction_graph(
         )
     _ensure_org_transaction(db, current_user.organization_id, transaction_id)
     return build_transaction_evidence_graph(
-        db, organization_id=current_user.organization_id, transaction_id=transaction_id
+        db,
+        organization_id=current_user.organization_id,
+        transaction_id=transaction_id,
+        include_history=include_history,
     )
+
+
+@router.post("/graph/transactions/{transaction_id}/rebuild")
+def rebuild_transaction_graph(
+    transaction_id: UUID,
+    current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if not get_settings().feature_evidence_graph:
+        raise AppError(
+            "FEATURE_DISABLED",
+            "Financial Evidence Graph feature flag is disabled.",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    _ensure_org_transaction(db, current_user.organization_id, transaction_id)
+    return rebuild_transaction_evidence_graph(
+        db,
+        organization_id=current_user.organization_id,
+        transaction_id=transaction_id,
+        actor_id=str(current_user.id),
+    )
+
+
+@router.get("/graph/obligations/{transaction_id}")
+def get_transaction_obligation_graph(
+    transaction_id: UUID,
+    current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if not get_settings().feature_evidence_graph:
+        raise AppError(
+            "FEATURE_DISABLED",
+            "Financial Evidence Graph feature flag is disabled.",
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    _ensure_org_transaction(db, current_user.organization_id, transaction_id)
+    return build_transaction_obligation_graph(
+        db,
+        organization_id=current_user.organization_id,
+        transaction_id=transaction_id,
+    )
+
+
+@router.get("/intelligence/agent-harness")
+def get_agent_harness_overview(
+    current_user: CurrentUserContext = Depends(require_permission("exceptions:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    settings = get_settings()
+    org_id = current_user.organization_id
+    invs = list(
+        db.scalars(
+            OrgScopedRepository(db, Investigation, org_id)
+            .base_query()
+            .order_by(desc(Investigation.created_at))
+            .limit(20)
+        ).all()
+    )
+    case_ids = [i.case_id for i in invs]
+    cases = (
+        {
+            c.id: c
+            for c in db.scalars(
+                OrgScopedRepository(db, ExceptionCase, org_id)
+                .base_query()
+                .where(ExceptionCase.id.in_(case_ids))
+            ).all()
+        }
+        if case_ids
+        else {}
+    )
+
+    active_model = {
+        "gemini": settings.gemini_model,
+        "groq": settings.groq_model,
+        "ollama": settings.ollama_model,
+    }.get(settings.llm_provider, "mock-deterministic-v1")
+
+    configured_agents = [
+        {
+            "id": "DocumentAgent",
+            "order": 1,
+            "name": "Document Agent",
+            "category": "ingestion",
+            "purpose": (
+                "Classify and process financial documents and expose structured information."
+            ),
+            "input_context": "transaction_id, linked Document rows",
+            "processing": (
+                "Retrieves transaction bundle and inspects NEEDS_REVIEW document statuses."
+            ),
+            "tools": ["get_transaction_bundle", "search_related_documents"],
+            "output": "bundle + linked_documents count + needs_review_files",
+            "execution_mode": "Deterministic DB retrieval + PyMuPDF/RapidOCR metadata",
+            "failure_recovery": "Records FAILED step in execution_trace and aborts safely.",
+        },
+        {
+            "id": "MatchingAgent",
+            "order": 2,
+            "name": "Matching Agent",
+            "category": "reconciliation",
+            "purpose": (
+                "Invoke the deterministic three-way reconciliation engine and inspect results."
+            ),
+            "input_context": "PO, GoodsReceipts, and Invoices from transaction bundle",
+            "processing": (
+                "Verifies 3-way completeness and identifies missing PO/GRN/Invoice records."
+            ),
+            "tools": ["run_reconciliation", "get_transaction_bundle"],
+            "output": "has_po, grn_count, invoice_count, missing_information",
+            "execution_mode": "Deterministic decimal.Decimal rule engine (zero floats)",
+            "failure_recovery": (
+                "Missing documents recorded explicitly as unknown/missing_information."
+            ),
+        },
+        {
+            "id": "RiskAgent",
+            "order": 3,
+            "name": "Risk Agent",
+            "category": "risk",
+            "purpose": "Evaluate anomaly indicators and identify transactions requiring scrutiny.",
+            "input_context": "transaction_id + organization invoice/vendor corpus",
+            "processing": (
+                "Runs duplicate, split-invoice, MAD price-spike, shared-bank, "
+                "and IsolationForest checks."
+            ),
+            "tools": ["evaluate_risks"],
+            "output": "Persisted RiskSignal list with reason codes and non-fraud disclaimer",
+            "execution_mode": "Deterministic rules + scikit-learn IsolationForest (when N>=15)",
+            "failure_recovery": "Falls back to transparent rules with limited_confidence if N<15.",
+        },
+        {
+            "id": "VendorIntelligenceAgent",
+            "order": 4,
+            "name": "Vendor Intelligence Agent",
+            "category": "vendor",
+            "purpose": "Retrieve historical vendor behaviour and contextual supplier metrics.",
+            "input_context": "vendor_id from transaction bundle",
+            "processing": "Computes mismatch_rate, avg_delivery_days, on_time_rate, small-N guard.",
+            "tools": ["get_vendor_history"],
+            "output": "Vendor profile summary and dispute history",
+            "execution_mode": "Deterministic DB aggregation (small-sample guard for N<5)",
+            "failure_recovery": "Omits reliability score when sample size N<5.",
+        },
+        {
+            "id": "EvidenceGraphAgent",
+            "order": 5,
+            "name": "Evidence Graph Agent",
+            "category": "graph",
+            "purpose": "Retrieve related suppliers, POs, GRNs, invoices, and historical links.",
+            "input_context": "transaction_id + include_history=True",
+            "processing": (
+                "Traverses relational PostgreSQL/SQLite graph including prior vendor POs."
+            ),
+            "tools": ["build_transaction_evidence_graph"],
+            "output": "graph_context (nodes, edges, historical POs)",
+            "execution_mode": "Relational graph traversal (PostgreSQL/SQLite)",
+            "failure_recovery": "Core reconciliation remains unaffected if graph flag is disabled.",
+        },
+        {
+            "id": "InvestigationAgent",
+            "order": 6,
+            "name": "Investigation Agent",
+            "category": "llm",
+            "purpose": (
+                "Combine validated findings, identify hypotheses, and recommend resolutions."
+            ),
+            "input_context": "Verified facts, fenced untrusted text, vendor & graph context",
+            "processing": (
+                "Calls LLMProvider.explain() and validates every evidence_ref against DB."
+            ),
+            "tools": ["LLMProvider.explain", "validate_evidence_refs"],
+            "output": "InvestigationOutputSchema (human_approval_required=True)",
+            "execution_mode": "LLM-assisted explanation + strict Pydantic & DB post-validation",
+            "failure_recovery": (
+                "Falls back to deterministic template if LLM fails; 422 on bad refs."
+            ),
+        },
+        {
+            "id": "AuditAgent",
+            "order": 7,
+            "name": "Audit Agent",
+            "category": "audit",
+            "purpose": "Record execution details and maintain traceability.",
+            "input_context": "tool_trace, execution_trace, validated InvestigationOutputSchema",
+            "processing": "Persists DRAFT_READY Investigation and immutable audit_event entries.",
+            "tools": ["create_investigation_draft", "record_audit_event"],
+            "output": "Persisted investigation_id + complete execution_trace",
+            "execution_mode": "Deterministic persistence + DB immutability triggers",
+            "failure_recovery": "Append-only audit trail prevents silent deletion or tampering.",
+        },
+    ]
+
+    harness_components = [
+        {"name": "Orchestrator", "role": "Coordinates 7-stage DAG order in FinanceOrchestrator."},
+        {
+            "name": "Shared Context Manager",
+            "role": "Passes typed OrchestrationContext across stages.",
+        },
+        {"name": "Tool Registry", "role": "Enforces ALLOWLISTED_AGENT_TOOLS (no SQL/pay/approve)."},
+        {"name": "Permission & Policy Layer", "role": "Enforces JWT RBAC and org-scoping."},
+        {
+            "name": "LLM Provider Adapter",
+            "role": "Routes mock / gemini / groq / ollama with fallback.",
+        },
+        {"name": "Evidence Validator", "role": "Rejects unresolvable UUIDs or unknown rule_ids."},
+        {
+            "name": "Execution Tracer",
+            "role": "Captures per-stage status, duration_ms, and summary.",
+        },
+        {
+            "name": "Human Approval Gate",
+            "role": "Requires authorized human decision with rationale.",
+        },
+    ]
+
+    recent_traces = []
+    for i in invs:
+        out = i.structured_output_json or {}
+        c = cases.get(i.case_id)
+        recent_traces.append(
+            {
+                "investigation_id": str(i.id),
+                "case_id": str(i.case_id),
+                "case_type": c.type if c else "UNKNOWN",
+                "case_severity": c.severity if c else "MEDIUM",
+                "transaction_id": str(c.transaction_id) if c else None,
+                "status": i.status,
+                "model_provider": i.model_provider,
+                "model_name": i.model_name,
+                "confidence": float(i.confidence),
+                "created_at": i.created_at.isoformat(),
+                "summary": out.get("summary", ""),
+                "human_approval_required": out.get("human_approval_required", True),
+                "evidence_refs": out.get("evidence_refs", []),
+                "execution_trace": out.get("execution_trace", []),
+                "tool_trace": out.get("tool_trace", []),
+            }
+        )
+
+    return {
+        "system_status": {
+            "configured_agents": len(configured_agents),
+            "active_provider": settings.llm_provider,
+            "active_model": active_model,
+            "graph_available": settings.feature_evidence_graph,
+            "total_investigations": len(recent_traces),
+            "successful_investigations": sum(
+                1 for t in recent_traces if t["status"] in ("DRAFT_READY", "COMPLETED")
+            ),
+        },
+        "configured_agents": configured_agents,
+        "harness_components": harness_components,
+        "recent_traces": recent_traces,
+    }
 
 
 @router.post("/copilot/query")
@@ -360,15 +623,54 @@ def get_cash_obligations(
         vname = vendors.get(inv.vendor_id, "Unknown")
         by_vendor[vname] = by_vendor.get(vname, Decimal("0")) + inv.total_amount
 
+    # Predictive 30/60/90-day cash-flow forecast combining scheduled open obligations
+    # and historical 30-day average invoice run-rate (deterministic Decimal math).
+    historical_total = sum((inv.total_amount for inv in invs), Decimal("0"))
+    inv_dates = [inv.invoice_date for inv in invs]
+    span_raw = (max(inv_dates, default=today) - min(inv_dates, default=today)).days
+    date_span_days = max(30, span_raw or 30)
+    daily_run_rate = historical_total / Decimal(str(date_span_days))
+    b_overdue_30 = buckets["OVERDUE"] + buckets["DUE_0_30"]
+    b_overdue_60 = b_overdue_30 + buckets["DUE_31_60"]
+    b_overdue_90 = b_overdue_60 + buckets["DUE_60_PLUS"]
+    forecast_30_60_90 = [
+        {
+            "horizon_days": 30,
+            "scheduled_amount": str(b_overdue_30.quantize(Decimal("0.01"))),
+            "projected_total": str(
+                (b_overdue_30 + daily_run_rate * Decimal("15")).quantize(Decimal("0.01"))
+            ),
+        },
+        {
+            "horizon_days": 60,
+            "scheduled_amount": str(b_overdue_60.quantize(Decimal("0.01"))),
+            "projected_total": str(
+                (b_overdue_60 + daily_run_rate * Decimal("30")).quantize(Decimal("0.01"))
+            ),
+        },
+        {
+            "horizon_days": 90,
+            "scheduled_amount": str(b_overdue_90.quantize(Decimal("0.01"))),
+            "projected_total": str(
+                (b_overdue_90 + daily_run_rate * Decimal("45")).quantize(Decimal("0.01"))
+            ),
+        },
+    ]
+
     return {
         "buckets": [{"bucket": k, "amount": str(v)} for k, v in buckets.items()],
         "by_vendor": [
             {"vendor": k, "amount": str(v)}
             for k, v in sorted(by_vendor.items(), key=lambda kv: kv[1], reverse=True)
         ],
+        "forecast_30_60_90": forecast_30_60_90,
+        "forecast_methodology": (
+            f"Scheduled due-date obligations + historical daily run-rate "
+            f"({daily_run_rate.quantize(Decimal('0.01'))}/day over {len(invs)} invoice(s))."
+        ),
         "note": (
-            "Aggregation of non-rejected invoices by due date; "
-            "trend forecast is illustrative only."
+            "Aggregation of non-rejected invoices by due date "
+            "with deterministic run-rate projection."
         ),
     }
 
