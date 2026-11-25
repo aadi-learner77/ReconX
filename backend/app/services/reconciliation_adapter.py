@@ -389,6 +389,16 @@ def execute_reconciliation(
                 )
             )
 
+    # Evaluate active administrator-defined dynamic policies (Donut Challenge 1)
+    from app.services.policies.engine import evaluate_active_policies_for_transaction
+
+    policy_results = evaluate_active_policies_for_transaction(
+        db,
+        organization_id=organization_id,
+        transaction_id=transaction_id,
+        reconciliation_run_id=run.id,
+    )
+
     # Update transaction status (note: never auto-approves payment; sets match outcome status)
     if po is not None:
         po.status = output.outcome.value
@@ -421,4 +431,5 @@ def execute_reconciliation(
         "rule_version": output.rule_version,
         "totals": run.totals_json,
         "exceptions": persisted_exceptions,
+        "policy_evaluations": policy_results,
     }
