@@ -71,6 +71,23 @@ All seeded synthetic users share default password `ReconXDemo#2026!` (override v
 - `auditor@reconx-demo.com` (Auditor — read-only + audit log access)
 - `admin@reconx-demo.com` (Admin — config, tolerances, users, job retry)
 
+## Seeded Scenario Lookup (`scripts/seed.py --reset`)
+Query any scenario via `GET /api/v1/transactions?scenario_label=<LABEL>`:
+
+| Scenario Label | Reference PO / Invoice | Description |
+|---|---|---|
+| `AT-01` | `PO-2026-0001` / `INV-BPC-1001` | Exact 3-way match (`100 @ 450.00`) |
+| `AT-02` | `PO-2026-0002` / `INV-SIF-2001` | Quantity over-billing (`PO=100`, `GRN accepted=90`, `Invoice=100`) |
+| `AT-03` | `PO-2026-0003` / `INV-BPC-1003` | Multi-GRN aggregation (`PO=100`, `GRN1=60` + `GRN2=40`, `Invoice=100`) |
+| `AT-04` | `PO-2026-0004` / `INV-DPC-3001` | Unit price variance (`PO=100.00`, `Invoice=112.00`, > 2% tolerance) |
+| `AT-05` / `AT-05-ORIGINAL` | `PO-2026-0005` & `PO-2026-0005B` / `INV-KPS-4001` | Duplicate supplier invoice number submitted twice |
+| `AT-06` | `INV-VEC-6001` (`po_id=None`) | Standalone invoice with no linked PO |
+| `SUPPLIER_MISMATCH` | `PO-2026-0007` / `INV-GLF-7001` | Invoice supplier differs from PO vendor |
+| `TAX_VARIANCE` | `PO-2026-0008` / `INV-AMA-8001` | Invoice tax (`11520.00`) deviates from PO 18% GST (`8640.00`) |
+| `SPLIT_INVOICE` | `PO-2026-0009` / `INV-BPC-9001A`, `INV-BPC-9001B` | Single PO/GRN (`20`) split across 2 invoices (`12` + `8`) |
+| `REJECTED_QUANTITY` | `PO-2026-0010` / `INV-SIF-1010` | GRN received `500` (`420` accepted, `80` rejected); billed `500` |
+| `TOLERANCE_PASS` | `PO-2026-0011` / `INV-DPC-1101` | Price variance (`+1.5%`) within configured `2%` tolerance |
+
 ---
 
 ## Verification & Evaluation Commands
