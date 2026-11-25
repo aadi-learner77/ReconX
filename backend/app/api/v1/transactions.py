@@ -424,6 +424,7 @@ def list_transactions(
     exception_type: str | None = Query(default=None),
     risk_level: str | None = Query(default=None),
     scenario_label: str | None = Query(default=None),
+    search: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=200),
     current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
@@ -548,6 +549,14 @@ def list_transactions(
             continue
         if scenario_label and item.scenario_label != scenario_label:
             continue
+        if search:
+            q_low = search.lower().strip()
+            if (
+                q_low not in (item.po_number or "").lower()
+                and q_low not in item.vendor_name.lower()
+                and q_low not in (item.scenario_label or "").lower()
+            ):
+                continue
         if risk_level and item.risk_level != risk_level:
             continue
         if exception_type:

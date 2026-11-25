@@ -65,9 +65,9 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | FR-WF-04 | P1 | `backend/app/services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
 | FR-WF-05 | P0 | `backend/app/models/domain.py`, `services/audit/` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
 | FR-WF-06 | P0 | `backend/app/services/workflows/approval.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_workflow_approvals.py` | IMPLEMENTED |
-| FR-UI-01 | P0 | `frontend/src/pages/DashboardPage.tsx`, `api/v1/dashboard.py` | `GET /api/v1/dashboard/summary` | `frontend/src/__tests__/Dashboard.test.tsx` | NOT_STARTED |
-| FR-UI-02 | P0 | `frontend/src/pages/TransactionsPage.tsx`, `api/v1/transactions.py` | `GET /api/v1/transactions` | `frontend/e2e/smoke.spec.ts` | NOT_STARTED |
-| FR-UI-03 | P0 | `frontend/src/pages/TransactionDetailPage.tsx` | `GET /api/v1/transactions/{id}` | `frontend/src/__tests__/DiffTable.test.tsx` | NOT_STARTED |
+| FR-UI-01 | P0 | `frontend/src/pages/DashboardPage.tsx`, `api/v1/intelligence.py` | `GET /api/v1/dashboard/summary` | `frontend/src/__tests__/components.test.tsx`, `e2e/smoke.spec.ts` | IMPLEMENTED |
+| FR-UI-02 | P0 | `frontend/src/pages/TransactionsPage.tsx`, `api/v1/transactions.py` | `GET /api/v1/transactions` | `frontend/e2e/smoke.spec.ts` | IMPLEMENTED |
+| FR-UI-03 | P0 | `frontend/src/pages/TransactionDetailPage.tsx` | `GET /api/v1/transactions/{id}` | `frontend/src/__tests__/components.test.tsx`, `e2e/smoke.spec.ts` | IMPLEMENTED |
 | FR-UI-04 | P1 | `backend/app/api/v1/intelligence.py` | `GET /api/v1/analytics/cash-obligations` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
 | FR-UI-05 | P1 | `backend/app/services/agents/copilot.py`, `api/v1/intelligence.py` | `POST /api/v1/copilot/query` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
 | FR-UI-06 | P1 | `backend/app/services/agents/copilot.py` | `POST /api/v1/copilot/query` | `backend/tests/test_intelligence_and_p2.py` | IMPLEMENTED |
@@ -94,7 +94,7 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | NFR-MAINT-01 | P0 | `backend/app/services/*` | N/A | `backend/tests/test_architecture_boundaries.py` | NOT_STARTED |
 | NFR-TEST-01 | P0 | `backend/app/services/reconciliation/` | N/A | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
 | NFR-SCALE-01 | P1 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | IMPLEMENTED |
-| NFR-UX-01 | P1 | `frontend/src/*` | N/A | `frontend/e2e/smoke.spec.ts` | NOT_STARTED |
+| NFR-UX-01 | P1 | `frontend/src/*` | N/A | `frontend/e2e/smoke.spec.ts` | IMPLEMENTED |
 | NFR-PORT-01 | P1 | `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile` | `GET /api/v1/health` | `docs/deployment.md` | NOT_STARTED |
 | NFR-OBS-01 | P0 | `backend/app/core/logging.py`, `middleware.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
 

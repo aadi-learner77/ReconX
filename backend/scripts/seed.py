@@ -20,6 +20,7 @@ if str(BACKEND_DIR) not in sys.path:
 from sqlalchemy import delete, select  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
+import app.models.audit  # noqa: E402, F401
 from app.core.database import Base, SessionLocal, engine, ensure_sqlite_audit_triggers  # noqa: E402
 from app.models.auth import Organization, RefreshToken, User, UserRole  # noqa: E402
 from app.models.config import AppConfig  # noqa: E402
@@ -219,6 +220,7 @@ def seed_synthetic_dataset(db: Session, *, reset: bool = False) -> dict[str, str
                 line_total=tot,
             )
         )
+        db.flush()
 
         for g_idx, (grn_num, acc_qty, rej_qty) in enumerate(grn_batches):
             grn_id = _det_uuid(f"grn-{key}-{g_idx}")
@@ -429,6 +431,7 @@ def seed_synthetic_dataset(db: Session, *, reset: bool = False) -> dict[str, str
             line_total=Decimal("17700.0000"),
         )
     )
+    db.flush()
     db.add(
         GoodsReceipt(
             id=_det_uuid("grn-at05-dup"),
