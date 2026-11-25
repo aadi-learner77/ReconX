@@ -27,19 +27,19 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | FR-EXT-03 | P0 | `backend/app/services/documents/field_validator.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
 | FR-EXT-04 | P0 | `backend/app/services/documents/field_validator.py` | `GET /api/v1/documents/{id}` | `backend/tests/test_acceptance.py` | NOT_STARTED |
 | FR-EXT-05 | P1 | `backend/app/services/documents/linker.py` | `GET /api/v1/documents/{id}/candidates` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-EXT-06 | P0 | `backend/app/services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
+| FR-EXT-06 | P0 | `backend/app/services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
 | FR-EXT-07 | P0 | `backend/app/models/document.py` | `PATCH /api/v1/documents/{id}/fields` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-MAT-01 | P0 | `backend/app/services/documents/linker.py` | `POST /api/v1/documents/{id}/link` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
-| FR-MAT-02 | P0 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
-| FR-MAT-03 | P0 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
-| FR-MAT-04 | P1 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
-| FR-MAT-05 | P0 | `backend/app/services/reconciliation/quantities.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
-| FR-MAT-06 | P0 | `backend/app/services/reconciliation/rules.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
-| FR-MAT-07 | P0 | `backend/app/services/reconciliation/rules.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
-| FR-MAT-08 | P0 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
-| FR-MAT-09 | P0 | `backend/app/services/reconciliation/engine.py`, `services/workflows/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
-| FR-EXC-01 | P0 | `backend/app/services/exceptions/` | `GET /api/v1/exceptions` | `backend/tests/test_reconciliation_api.py` | NOT_STARTED |
-| FR-EXC-02 | P0 | `backend/app/models/exception.py` | `GET /api/v1/exceptions/{id}` | `backend/tests/test_reconciliation_api.py` | NOT_STARTED |
+| FR-MAT-01 | P0 | `backend/app/services/documents/linker.py` | `POST /api/v1/documents/{id}/link` | `backend/tests/test_document_pipeline.py` | IN_PROGRESS |
+| FR-MAT-02 | P0 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
+| FR-MAT-03 | P0 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
+| FR-MAT-04 | P1 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
+| FR-MAT-05 | P0 | `backend/app/services/reconciliation/quantities.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
+| FR-MAT-06 | P0 | `backend/app/services/reconciliation/rules.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
+| FR-MAT-07 | P0 | `backend/app/services/reconciliation/rules.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
+| FR-MAT-08 | P0 | `backend/app/services/reconciliation/engine.py` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
+| FR-MAT-09 | P0 | `backend/app/services/reconciliation/engine.py`, `services/workflows/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
+| FR-EXC-01 | P0 | `backend/app/services/exceptions/` | `GET /api/v1/exceptions` | `backend/tests/test_reconciliation_api.py` | IMPLEMENTED |
+| FR-EXC-02 | P0 | `backend/app/models/exception.py` | `GET /api/v1/exceptions/{id}` | `backend/tests/test_reconciliation_api.py` | IMPLEMENTED |
 | FR-EXC-03 | P1 | `backend/app/services/agents/investigator.py` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_investigation_agent.py` | NOT_STARTED |
 | FR-EXC-04 | P1 | `backend/app/services/agents/investigator.py` | `GET /api/v1/investigations/{id}` | `backend/tests/test_investigation_agent.py` | NOT_STARTED |
 | FR-EXC-05 | P1 | `backend/app/services/agents/schemas.py` | `GET /api/v1/investigations/{id}` | `backend/tests/test_investigation_agent.py` | NOT_STARTED |
@@ -47,7 +47,7 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | FR-EXC-07 | P0 | `backend/app/services/agents/tools.py` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_security_agent.py` | NOT_STARTED |
 | FR-EXC-08 | P0 | `backend/app/api/v1/exceptions.py` | `POST /api/v1/exceptions/{id}/assign`, `/comments`, `/decision` | `backend/tests/test_workflow_approvals.py` | NOT_STARTED |
 | FR-EXC-09 | P0 | `backend/app/services/agents/tools.py`, `services/audit/` | `GET /api/v1/audit` | `backend/tests/test_investigation_agent.py` | NOT_STARTED |
-| FR-RISK-01 | P0 | `backend/app/services/reconciliation/rules.py`, `services/risk/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_risk_service.py` | NOT_STARTED |
+| FR-RISK-01 | P0 | `backend/app/services/reconciliation/rules.py`, `services/risk/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
 | FR-RISK-02 | P1 | `backend/app/services/risk/duplicates.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_risk_service.py` | NOT_STARTED |
 | FR-RISK-03 | P1 | `backend/app/services/risk/price_anomaly.py` | `GET /api/v1/transactions/{id}/risk` | `backend/tests/test_risk_service.py` | NOT_STARTED |
 | FR-RISK-04 | P1 | `backend/app/services/risk/vendor_patterns.py` | `GET /api/v1/vendors/{id}` | `backend/tests/test_risk_service.py` | NOT_STARTED |
@@ -92,7 +92,7 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 | NFR-SEC-03 | P0 | `backend/app/repositories/base.py`, `core/permissions.py` | All `/api/v1/*` | `backend/tests/test_security_sweep.py` | IMPLEMENTED |
 | NFR-AUD-01 | P0 | `backend/app/services/audit/service.py` | `GET /api/v1/audit` | `backend/tests/test_audit.py` | IMPLEMENTED |
 | NFR-MAINT-01 | P0 | `backend/app/services/*` | N/A | `backend/tests/test_architecture_boundaries.py` | NOT_STARTED |
-| NFR-TEST-01 | P0 | `backend/app/services/reconciliation/` | N/A | `backend/tests/test_reconciliation_engine.py` | NOT_STARTED |
+| NFR-TEST-01 | P0 | `backend/app/services/reconciliation/` | N/A | `backend/tests/test_reconciliation_engine.py` | IMPLEMENTED |
 | NFR-SCALE-01 | P1 | `backend/app/workers/job_worker.py` | `POST /api/v1/documents` | `backend/tests/test_document_pipeline.py` | NOT_STARTED |
 | NFR-UX-01 | P1 | `frontend/src/*` | N/A | `frontend/e2e/smoke.spec.ts` | NOT_STARTED |
 | NFR-PORT-01 | P1 | `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile` | `GET /api/v1/health` | `docs/deployment.md` | NOT_STARTED |
@@ -102,12 +102,12 @@ Status values: `NOT_STARTED` | `IN_PROGRESS` | `IMPLEMENTED` | `DEFERRED`.
 
 | ID | Priority | Module | API Endpoint | Test File | Status |
 |---|---|---|---|---|---|
-| AT-01 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| AT-02 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| AT-03 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| AT-04 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| AT-05 | P0 | `services/reconciliation/`, `services/risk/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |
-| AT-06 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |
+| AT-01 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
+| AT-02 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
+| AT-03 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
+| AT-04 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
+| AT-05 | P0 | `services/reconciliation/`, `services/risk/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
+| AT-06 | P0 | `services/reconciliation/` | `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_reconciliation_api.py`, `test_reconciliation_engine.py` | IMPLEMENTED |
 | AT-07 | P0 | `services/documents/` | `GET /api/v1/documents/{id}`, `POST /api/v1/transactions/{id}/reconcile` | `backend/tests/test_acceptance.py` | NOT_STARTED |
 | AT-08 | P0 | `services/agents/` | `POST /api/v1/exceptions/{id}/investigations` | `backend/tests/test_acceptance.py` | NOT_STARTED |
 | AT-09 | P0 | `api/v1/exceptions.py`, `core/permissions.py` | `POST /api/v1/exceptions/{id}/decision` | `backend/tests/test_acceptance.py` | NOT_STARTED |
