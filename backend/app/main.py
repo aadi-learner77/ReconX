@@ -16,6 +16,7 @@ from app.core.exceptions import (
 )
 from app.core.logging import configure_logging, correlation_id_var, get_logger, request_id_var
 from app.workers.job_worker import background_worker
+from app.services.neo4j import ensure_neo4j_schema, neo4j_manager
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -24,6 +25,7 @@ logger = get_logger("reconx.api")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    ensure_neo4j_schema()
     if settings.worker_enabled:
         background_worker.start()
     try:
@@ -31,6 +33,7 @@ async def lifespan(_: FastAPI):
     finally:
         if settings.worker_enabled:
             background_worker.stop()
+        neo4j_manager.close()
 
 
 def create_app() -> FastAPI:

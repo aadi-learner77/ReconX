@@ -47,6 +47,18 @@ class Settings(BaseSettings):
     feature_cash_view: bool = True
     feature_report_exports: bool = True
 
+    graph_backend: str = "relational"
+    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_username: str = "neo4j"
+    neo4j_password: str = ""
+    neo4j_database: str = "neo4j"
+    feature_neo4j_agent_graph: bool = True
+    feature_neo4j_obligation_graph: bool = True
+    graph_sync_enabled: bool = True
+    graph_sync_batch_size: int = 200
+    graph_sync_retry_limit: int = 5
+    graph_query_timeout_seconds: int = 15
+
     seed_org_name: str = "Acme Manufacturing India Pvt Ltd"
     seed_default_password: str = "ReconXDemo#2026!"
 
