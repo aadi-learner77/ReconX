@@ -7,6 +7,7 @@ import type { DocumentItem, ExtractedFieldItem } from "../api/types";
 import {
   Button,
   Card,
+  ConfidenceMeter,
   EmptyState,
   PageCaption,
   PageSkeleton,
@@ -328,21 +329,11 @@ export const DocumentsPage: React.FC = () => {
               </div>
 
               {/* OCR Classification Confidence Meter */}
-              <div className="p-3 rounded-control bg-sand-50 border border-sand-200 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold uppercase tracking-[0.08em] text-ink-500 text-[11px]">
-                    OCR Classification Confidence
-                  </span>
-                  <span className="font-mono font-semibold text-ink-900">
-                    {Math.round(docDetail.classification_confidence * 100)}%
-                  </span>
-                </div>
-                <div className="h-2 rounded-full bg-sand-200 overflow-hidden">
-                  <div
-                    className="h-full bg-ink-900 rounded-full transition-all"
-                    style={{ width: `${Math.round(docDetail.classification_confidence * 100)}%` }}
-                  />
-                </div>
+              <div className="p-3 rounded-control bg-sand-50 border border-sand-200 flex items-center justify-between gap-3">
+                <span className="font-semibold uppercase tracking-[0.08em] text-ink-500 text-[11px]">
+                  OCR Classification Confidence
+                </span>
+                <ConfidenceMeter value={docDetail.classification_confidence} />
               </div>
 
               {validationWarningsField && (

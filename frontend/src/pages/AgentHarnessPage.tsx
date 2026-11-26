@@ -2,18 +2,20 @@ import React, { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import ReactFlow, { Background, Controls, MarkerType, type Edge, type Node } from "reactflow";
 import "reactflow/dist/style.css";
-import { Cpu, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
+import { Cpu, Lock, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import {
+  Badge,
   Button,
   Card,
+  Drawer,
   EmptyState,
   PageCaption,
   PageSkeleton,
   Stat,
   StatusPill,
-  Stepper,
   type StepItem,
 } from "../components/ui";
 import { flowControlStyle, flowEdgeStyle, flowNodeStyle } from "../theme/flowTheme";
@@ -27,6 +29,8 @@ export const AgentHarnessPage: React.FC = () => {
 
   const [selectedAgentId, setSelectedAgentId] = useState<string>("DocumentAgent");
   const [selectedTraceId, setSelectedTraceId] = useState<string>("");
+  const [selectedFlowNode, setSelectedFlowNode] = useState<any | null>(null);
+  const [telemetryStage, setTelemetryStage] = useState<any | null>(null);
   const [testResult, setTestResult] = useState<any | null>(null);
 
   const testGeminiMut = useMutation({
@@ -44,11 +48,23 @@ export const AgentHarnessPage: React.FC = () => {
   const harnessComponents: any[] = data?.harness_components || [];
   const sys = data?.system_status;
   const gtel = data?.gemini_telemetry;
+  const graphSync = sys?.graph_sync;
 
   const activeTrace = useMemo(() => {
     if (!traces.length) return null;
     return traces.find((t) => t.investigation_id === selectedTraceId) || traces[0];
   }, [traces, selectedTraceId]);
+
+  const { data: neo4jRunGraph } = useQuery({
+    queryKey: ["agent-neo4j-graph", activeTrace?.investigation_id],
+    queryFn: () => api.getAgentGraphExecution(activeTrace!.investigation_id),
+    enabled: Boolean(activeTrace?.investigation_id),
+  });
+
+  const { data: crossAnalytics } = useQuery({
+    queryKey: ["agent-cross-analytics"],
+    queryFn: api.getAgentGraphAnalytics,
+  });
 
   const selectedAgent = useMemo(
     () => agents.find((a) => a.id === selectedAgentId) || agents[0] || null,
@@ -75,7 +91,26 @@ export const AgentHarnessPage: React.FC = () => {
     return items;
   }, [agents, activeTrace]);
 
-  const { rfNodes, rfEdges } = useMemo(() => {
+  const { rfNodes, rfEdges, graphIsNeo4j } = useMemo(() => {
+    if (neo4jRunGraph?.nodes?.length > 0) {
+      const nodes: Node[] = neo4jRunGraph.nodes.map((n: any, idx: number) => ({
+        id: n.id,
+        position: { x: (idx % 4) * 255, y: Math.floor(idx / 4) * 120 },
+        data: { label: `${n.type}: ${n.label}`, raw: n },
+        style: flowNodeStyle(n.type, selectedFlowNode?.id === n.id),
+      }));
+      const edges: Edge[] = (neo4jRunGraph.edges || []).map((e: any) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        label: e.label,
+        labelStyle: { fontSize: 10, fill: "var(--ink-500)", fontFamily: "JetBrains Mono, monospace" },
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: flowEdgeStyle(false),
+      }));
+      return { rfNodes: nodes, rfEdges: edges, graphIsNeo4j: neo4jRunGraph.source === "neo4j" };
+    }
+
     const chain = [
       { id: "FinanceOrchestrator", label: "Finance Orchestrator", category: "orchestrator" },
       ...agents.map((a) => ({ id: a.id, label: `${a.order}. ${a.name}`, category: a.category })),
@@ -98,8 +133,8 @@ export const AgentHarnessPage: React.FC = () => {
       markerEnd: { type: MarkerType.ArrowClosed },
       style: flowEdgeStyle(false),
     }));
-    return { rfNodes: nodes, rfEdges: edges };
-  }, [agents, selectedAgentId]);
+    return { rfNodes: nodes, rfEdges: edges, graphIsNeo4j: false };
+  }, [neo4jRunGraph, agents, selectedAgentId, selectedFlowNode]);
 
   if (isLoading) return <PageSkeleton />;
   if (error || !data) {
@@ -115,8 +150,12 @@ export const AgentHarnessPage: React.FC = () => {
       {/* Hero */}
       <Card variant="hero">
         <PageCaption
-          module="Intelligence / Governance & Orchestration"
-          index="7-Stage Evidence Harness"
+          module="Intelligence / Neo4j Agent Execution Graph"
+          index={
+            graphSync?.neo4j_connected
+              ? `Neo4j Connected (${graphSync.nodes_synchronized} nodes)`
+              : "7-Stage Evidence Harness"
+          }
         />
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="max-w-2xl">
@@ -128,8 +167,9 @@ export const AgentHarnessPage: React.FC = () => {
               Inside the ReconX Intelligence Engine
             </h1>
             <p className="text-sm text-ink-700 mt-2">
-              Coordinates financial analysis, investigation, and controlled decision workflows. The
-              agent harness itself is the execution and governance layer — not an eighth agent.
+              Coordinates financial analysis, investigation, and controlled decision workflows.
+              Persisted runs, stage executions, tool calls, and evidence citations are synchronized
+              to Neo4j.
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -137,24 +177,158 @@ export const AgentHarnessPage: React.FC = () => {
             <Stat label="Runs" value={sys.total_investigations} className="p-3.5" />
             <Stat label="Succeeded" value={sys.successful_investigations} tone="success" className="p-3.5" />
             <Stat label="Provider" value={String(sys.active_provider).toUpperCase()} mono className="p-3.5" />
-            <Stat label="Graph" value={sys.graph_available ? "ON" : "OFF"} mono className="p-3.5" />
+            <Stat
+              label="Neo4j"
+              value={graphSync?.neo4j_connected ? "ONLINE" : "OFFLINE"}
+              tone={graphSync?.neo4j_connected ? "success" : "warning"}
+              mono
+              className="p-3.5"
+            />
           </div>
         </div>
       </Card>
 
-      {/* Horizontal 7-Stage Stepper */}
-      <Card className="space-y-3">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-          Seven-Stage Execution Pipeline + Human Gate
+      {/* Horizontal Animated 7-Stage Pipeline + Brass Human Gate */}
+      <Card className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+            Seven-Stage Execution Pipeline + Human Approval Gate (Click stage for telemetry)
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-mono text-ink-500">
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-status-success-fg" /> done</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-status-info-fg" /> running</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-status-warning-fg" /> fallback</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-sand-400" /> idle</span>
+          </div>
         </div>
-        <Stepper
-          steps={stepperItems}
-          activeId={selectedAgentId}
-          onSelect={(id) => {
-            if (agents.some((a) => a.id === id)) setSelectedAgentId(id);
-          }}
-        />
+        <div className="overflow-x-auto pb-2">
+          <div className="inline-flex items-center gap-2 min-w-max">
+            {stepperItems.map((step, idx) => {
+              const isGate = step.id === "HumanApprovalGate";
+              const traceStep = ((activeTrace?.execution_trace as any[]) || []).find(
+                (t) => t.agent === step.id || t.agent === step.label.replace(/^\d+\.\s*/, "")
+              );
+              const isSelected = selectedAgentId === step.id;
+              const ringClass =
+                step.state === "done"
+                  ? "ring-2 ring-status-success-fg/70"
+                  : step.state === "running"
+                    ? "ring-2 ring-status-info-fg animate-pulse"
+                    : step.state === "fallback"
+                      ? "ring-2 ring-status-warning-fg/80"
+                      : "ring-1 ring-sand-300";
+
+              return (
+                <React.Fragment key={step.id}>
+                  <motion.button
+                    type="button"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.04, duration: 0.2 }}
+                    onClick={() => {
+                      if (!isGate && agents.some((a) => a.id === step.id)) {
+                        setSelectedAgentId(step.id);
+                      }
+                      setTelemetryStage({
+                        id: step.id,
+                        label: step.label,
+                        state: step.state,
+                        isGate,
+                        duration_ms: traceStep?.duration_ms ?? null,
+                        provider:
+                          activeTrace?.model_provider || sys?.active_provider || "mock",
+                        fallback_used: step.state === "fallback",
+                        tokens: traceStep?.tokens ?? "Unavailable",
+                        summary:
+                          traceStep?.summary ||
+                          (isGate
+                            ? "Deterministic maker-checker human approval gate. AI cannot approve or pay."
+                            : "Stage ready in orchestrator."),
+                      });
+                    }}
+                    className={`rounded-card px-3.5 py-2.5 text-left transition-all min-w-[148px] ${
+                      isGate
+                        ? "border-2 border-status-warning-fg bg-status-warning-bg/35 text-ink-900 shadow-card"
+                        : isSelected
+                          ? `bg-ink-900 text-on-ink ${ringClass}`
+                          : `bg-paper text-ink-900 border border-sand-200 hover:border-sand-400 ${ringClass}`
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold truncate">{step.label}</span>
+                      {isGate && <Lock className="w-3.5 h-3.5 text-status-warning-fg shrink-0" />}
+                    </div>
+                    <div
+                      className={`mt-1 font-mono text-[10px] ${
+                        isSelected && !isGate ? "text-on-ink/75" : "text-ink-500"
+                      }`}
+                    >
+                      {traceStep?.duration_ms !== undefined
+                        ? `${traceStep.duration_ms} ms`
+                        : step.state.toUpperCase()}
+                    </div>
+                  </motion.button>
+                  {idx < stepperItems.length - 1 && (
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: idx * 0.04 }}
+                      className="text-ink-500 font-mono text-xs select-none px-0.5"
+                      aria-hidden="true"
+                    >
+                      ──▶
+                    </motion.span>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
       </Card>
+
+      {/* Expandable Stage Telemetry Drawer */}
+      <Drawer
+        open={Boolean(telemetryStage)}
+        onClose={() => setTelemetryStage(null)}
+        title={telemetryStage?.label || "Stage Telemetry"}
+        subtitle={telemetryStage?.isGate ? "Human Governance Gate" : "Agent Stage Execution Telemetry"}
+      >
+        {telemetryStage && (
+          <div className="space-y-4 text-xs">
+            <div className="flex items-center justify-between">
+              <StatusPill value={telemetryStage.state.toUpperCase()} />
+              {telemetryStage.isGate && (
+                <Badge value="Human Gate · Brass Guard" tone="warning" />
+              )}
+            </div>
+            <div className="rounded-card border border-sand-200 bg-sand-50 p-4 space-y-2.5 font-mono">
+              <div className="flex justify-between">
+                <span className="text-ink-500">Provider</span>
+                <span className="font-semibold text-ink-900 uppercase">{telemetryStage.provider}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-ink-500">Duration</span>
+                <span className="font-semibold text-ink-900">
+                  {telemetryStage.duration_ms !== null ? `${telemetryStage.duration_ms} ms` : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-ink-500">Tokens</span>
+                <span className="font-semibold text-ink-900">{String(telemetryStage.tokens)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-ink-500">Fallback Used</span>
+                <span className="font-semibold text-ink-900">
+                  {telemetryStage.fallback_used ? "YES" : "NO"}
+                </span>
+              </div>
+            </div>
+            <div className="p-3.5 rounded-card border border-sand-200 bg-paper text-ink-700 leading-relaxed">
+              {telemetryStage.summary}
+            </div>
+          </div>
+        )}
+      </Drawer>
 
       {/* Google Gemini Integration Showcase */}
       {gtel && (
@@ -230,44 +404,41 @@ export const AgentHarnessPage: React.FC = () => {
               <div className="font-mono font-semibold text-ink-500 mt-1">Unavailable</div>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="p-4 rounded-card bg-sand-50 border border-sand-200">
-              <div className="font-semibold text-ink-900 mb-1.5">Where Gemini Assists</div>
-              <ul className="list-disc pl-4 text-ink-700 space-y-1">
-                <li>Natural-language investigation summaries over DB-verified facts</li>
-                <li>Contextual interpretation of discrepancies and vendor history</li>
-                <li>Clearly labeled unverified hypotheses and recommended next steps</li>
-              </ul>
-            </div>
-            <div className="p-4 rounded-card bg-sand-100 border border-sand-200">
-              <div className="font-semibold text-ink-900 mb-1.5">What Gemini Never Does</div>
-              <ul className="list-disc pl-4 text-ink-700 space-y-1">
-                <li>Never calculates authoritative totals or overrides 3-way matching</li>
-                <li>Never creates unvalidated evidence refs, approves invoices, or pays</li>
-                <li>Never bypasses RBAC, maker-checker, or audit immutability</li>
-              </ul>
-            </div>
-          </div>
         </Card>
       )}
 
-      {/* Interactive Agent Architecture + Right Inspector */}
+      {/* Interactive Neo4j Execution Graph + Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <h2 className="font-display text-lg font-bold text-ink-900 mb-1">
-            Seven-Stage Investigation Pipeline (Click an Agent Node to Inspect)
-          </h2>
-          <p className="text-xs text-ink-500 mb-3">
-            Verified order in <code className="font-mono">FinanceOrchestrator.run_pipeline()</code>
-          </p>
-          <div className="hidden sm:block h-80 border border-sand-200 rounded-card bg-sand-50 overflow-hidden">
+        <Card className="lg:col-span-2 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-display text-lg font-bold text-ink-900">
+                {graphIsNeo4j
+                  ? "Neo4j Investigation Execution Graph (Real Persisted Run)"
+                  : "Seven-Stage Investigation Pipeline (Click an Agent Node to Inspect)"}
+              </h2>
+              <p className="text-xs text-ink-500">
+                {graphIsNeo4j
+                  ? "Live Neo4j graph: AgentRun → AgentStageExecution → ToolCall & EvidenceReference"
+                  : "Run an investigation on an exception to inspect its live Neo4j execution graph."}
+              </p>
+            </div>
+            {graphIsNeo4j && <StatusPill value="NEO4J LIVE" tone="success" />}
+          </div>
+          <div className="hidden sm:block h-96 border border-sand-200 rounded-card bg-sand-50 overflow-hidden">
             <ReactFlow
               nodes={rfNodes}
               edges={rfEdges}
               fitView
+              fitViewOptions={{ padding: 0.18 }}
               onNodeClick={(_, node) => {
-                if (agents.some((a) => a.id === node.id)) {
+                const raw = (node.data as any)?.raw;
+                if (raw) {
+                  setSelectedFlowNode(raw);
+                  const matched = agents.find((a) => a.id === raw.data?.agent_name);
+                  if (matched) setSelectedAgentId(matched.id);
+                } else if (agents.some((a) => a.id === node.id)) {
+                  setSelectedFlowNode(null);
                   setSelectedAgentId(node.id);
                 }
               }}
@@ -276,22 +447,32 @@ export const AgentHarnessPage: React.FC = () => {
               <Controls style={flowControlStyle} />
             </ReactFlow>
           </div>
-          <ol className="sm:hidden space-y-2 text-xs">
-            {agents.map((a) => (
-              <li
-                key={a.id}
-                onClick={() => setSelectedAgentId(a.id)}
-                className="p-2.5 rounded-control border border-sand-200 bg-sand-50 font-medium"
-              >
-                {a.order}. {a.name}
-              </li>
-            ))}
-          </ol>
         </Card>
 
-        <Card>
-          <h2 className="font-display text-lg font-bold text-ink-900 mb-3">Agent Inspector</h2>
-          {selectedAgent ? (
+        <Card className="space-y-4">
+          <h2 className="font-display text-lg font-bold text-ink-900">
+            {selectedFlowNode ? `${selectedFlowNode.type} Inspector` : "Agent Inspector"}
+          </h2>
+          {selectedFlowNode ? (
+            <div className="space-y-2.5 text-xs">
+              <div className="font-display text-base font-bold text-ink-900">
+                {selectedFlowNode.label}
+              </div>
+              <div className="p-3 rounded-control bg-sand-50 border border-sand-200 space-y-1.5">
+                {Object.entries(selectedFlowNode.data || {}).map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-2">
+                    <span className="text-ink-500">{k}</span>
+                    <span className="font-mono text-ink-900 text-right break-all">
+                      {String(v)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setSelectedFlowNode(null)}>
+                Back to Agent Definition
+              </Button>
+            </div>
+          ) : selectedAgent ? (
             <div className="space-y-3 text-xs">
               <div className="font-display text-lg font-bold text-ink-900">{selectedAgent.name}</div>
               <p className="text-ink-700">{selectedAgent.purpose}</p>
@@ -315,10 +496,6 @@ export const AgentHarnessPage: React.FC = () => {
                 <span className="font-semibold text-ink-900">Mode:</span>{" "}
                 <span className="font-mono text-ink-700">{selectedAgent.execution_mode}</span>
               </div>
-              <div>
-                <span className="font-semibold text-ink-900">Failure &amp; Recovery:</span>{" "}
-                <span className="text-ink-700">{selectedAgent.failure_recovery}</span>
-              </div>
               {selectedAgent.id === "RiskAgent" && (
                 <div className="p-2.5 rounded-control bg-status-info-bg text-status-info-fg font-semibold">
                   Risk indicators, not proof of fraud.
@@ -326,10 +503,79 @@ export const AgentHarnessPage: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="text-xs text-ink-500">Select an agent node to inspect.</div>
+            <div className="text-xs text-ink-500">Select an agent or execution node to inspect.</div>
           )}
         </Card>
       </div>
+
+      {/* Cross-Investigation Explorer (Neo4j Cypher) */}
+      {crossAnalytics && (
+        <Card className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-display text-lg font-bold text-ink-900">
+                Cross-Investigation Relationship Explorer (Neo4j)
+              </h2>
+              <p className="text-xs text-ink-500">
+                Repeated vendor investigations, shared evidence citations, and stage execution health.
+              </p>
+            </div>
+            <StatusPill
+              value={crossAnalytics.source === "neo4j" ? "NEO4J CYPHER" : "UNAVAILABLE"}
+              tone={crossAnalytics.source === "neo4j" ? "success" : "warning"}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div className="p-3.5 rounded-card bg-sand-50 border border-sand-200 space-y-2">
+              <div className="font-semibold uppercase tracking-[0.08em] text-[11px] text-ink-500">
+                Investigations by Vendor
+              </div>
+              {(crossAnalytics.vendor_investigations || []).length === 0 ? (
+                <div className="text-ink-500">No vendor investigations synced yet.</div>
+              ) : (
+                crossAnalytics.vendor_investigations.map((v: any, i: number) => (
+                  <div key={i} className="flex justify-between gap-2 border-b border-sand-200 pb-1 last:border-b-0">
+                    <span className="font-medium text-ink-900 truncate">{v.vendor_name}</span>
+                    <span className="font-mono font-bold text-ink-900">{v.investigation_count}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-3.5 rounded-card bg-sand-50 border border-sand-200 space-y-2">
+              <div className="font-semibold uppercase tracking-[0.08em] text-[11px] text-ink-500">
+                Shared Evidence Citations
+              </div>
+              {(crossAnalytics.shared_evidence || []).length === 0 ? (
+                <div className="text-ink-500">No evidence references synced yet.</div>
+              ) : (
+                crossAnalytics.shared_evidence.map((e: any, i: number) => (
+                  <div key={i} className="flex justify-between gap-2 border-b border-sand-200 pb-1 last:border-b-0 font-mono">
+                    <span className="truncate text-ink-900">{e.label}</span>
+                    <span className="font-bold text-ink-900">{e.cite_count}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-3.5 rounded-card bg-sand-50 border border-sand-200 space-y-2">
+              <div className="font-semibold uppercase tracking-[0.08em] text-[11px] text-ink-500">
+                Stage Execution Reliability
+              </div>
+              {(crossAnalytics.stage_stats || []).length === 0 ? (
+                <div className="text-ink-500">No stage executions synced yet.</div>
+              ) : (
+                crossAnalytics.stage_stats.map((s: any, i: number) => (
+                  <div key={i} className="flex justify-between gap-2 border-b border-sand-200 pb-1 last:border-b-0 font-mono">
+                    <span className="text-ink-900">{s.agent_name}</span>
+                    <span className="text-status-success-fg">
+                      {s.succeeded}/{s.total_runs}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Harness Infrastructure */}
       <Card>
@@ -362,7 +608,10 @@ export const AgentHarnessPage: React.FC = () => {
             <select
               aria-label="Select investigation trace"
               value={activeTrace?.investigation_id || ""}
-              onChange={(e) => setSelectedTraceId(e.target.value)}
+              onChange={(e) => {
+                setSelectedFlowNode(null);
+                setSelectedTraceId(e.target.value);
+              }}
               className="px-3 py-2 rounded-control border border-sand-200 text-xs bg-sand-50 font-mono"
             >
               {traces.map((t) => (

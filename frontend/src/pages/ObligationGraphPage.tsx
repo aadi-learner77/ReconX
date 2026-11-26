@@ -2,8 +2,9 @@ import React, { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactFlow, { Background, Controls, MarkerType, MiniMap, type Edge, type Node } from "reactflow";
 import "reactflow/dist/style.css";
-import { Network, RefreshCw } from "lucide-react";
+import { GitBranch, Network, RefreshCw, ShieldAlert } from "lucide-react";
 import { api } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import {
   Button,
   Card,
@@ -19,12 +20,18 @@ import { formatInrString } from "../utils/money";
 
 export const ObligationGraphPage: React.FC = () => {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState("ALL");
-  const [viewMode, setViewMode] = useState<"obligation" | "evidence">("obligation");
+  const [viewMode, setViewMode] = useState<"overview" | "evidence" | "vendor" | "fulfilment">("overview");
   const [selectedTxId, setSelectedTxId] = useState<string>("");
   const [selectedNode, setSelectedNode] = useState<any | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [nodeFocusQuery, setNodeFocusQuery] = useState("");
+  const [pathSrc, setPathSrc] = useState<string>("");
+  const [pathDst, setPathDst] = useState<string>("");
+  const [pathResult, setPathResult] = useState<any | null>(null);
 
   const { data: txData, isLoading: txLoading } = useQuery({
     queryKey: ["obligation-tx-list", search, statusFilter],
@@ -34,6 +41,16 @@ export const ObligationGraphPage: React.FC = () => {
         status: statusFilter,
         page_size: "50",
       }),
+  });
+
+  const { data: graphHealth, refetch: refetchHealth } = useQuery({
+    queryKey: ["graph-health"],
+    queryFn: api.getGraphHealth,
+  });
+
+  const { data: riskDiscovery } = useQuery({
+    queryKey: ["graph-risk-discovery"],
+    queryFn: api.getGraphRiskDiscovery,
   });
 
   const transactions = txData?.items || [];
@@ -52,20 +69,43 @@ export const ObligationGraphPage: React.FC = () => {
     refetch,
   } = useQuery({
     queryKey: ["graph-view", viewMode, activeTxId],
-    queryFn: () =>
-      viewMode === "obligation"
-        ? api.getObligationGraph(activeTxId)
-        : api.getTransactionGraph(activeTxId),
+    queryFn: () => api.getObligationGraph(activeTxId, viewMode),
     enabled: Boolean(activeTxId),
   });
 
   const rebuildMut = useMutation({
     mutationFn: () => api.rebuildTransactionGraph(activeTxId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["graph-view"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["graph-view"] });
+      refetchHealth();
+    },
+  });
+
+  const backfillMut = useMutation({
+    mutationFn: api.backfillGraph,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["graph-view"] });
+      qc.invalidateQueries({ queryKey: ["graph-risk-discovery"] });
+      refetchHealth();
+    },
+  });
+
+  const pathMut = useMutation({
+    mutationFn: () => api.getRelationshipPath(pathSrc, pathDst),
+    onSuccess: (res) => setPathResult(res),
   });
 
   const rawNodes: any[] = graphData?.nodes || [];
   const rawEdges: any[] = graphData?.edges || [];
+
+  const pathNodeIds = useMemo(
+    () => new Set((pathResult?.nodes || []).map((n: any) => n.id)),
+    [pathResult]
+  );
+  const pathEdgeIds = useMemo(
+    () => new Set((pathResult?.edges || []).map((e: any) => e.id)),
+    [pathResult]
+  );
 
   const filteredNodes = useMemo(() => {
     if (entityFilter === "ALL") return rawNodes;
@@ -74,43 +114,82 @@ export const ObligationGraphPage: React.FC = () => {
 
   const visibleNodeIds = useMemo(() => new Set(filteredNodes.map((n) => n.id)), [filteredNodes]);
 
-  const rfNodes: Node[] = useMemo(
-    () =>
-      filteredNodes.map((n, idx) => {
-        const isHighlighted = Boolean(
-          selectedNode &&
-            (selectedNode.id === n.id ||
-              rawEdges.some(
-                (e) =>
-                  (e.source === selectedNode.id && e.target === n.id) ||
-                  (e.target === selectedNode.id && e.source === n.id)
-              ))
-        );
-        return {
-          id: n.id,
-          position: { x: (idx % 4) * 255, y: Math.floor(idx / 4) * 125 },
-          data: { label: `${n.type}: ${n.label}`, raw: n },
-          style: flowNodeStyle(n.type, isHighlighted),
-        };
-      }),
-    [filteredNodes, selectedNode, rawEdges]
-  );
+  const rfNodes: Node[] = useMemo(() => {
+    const laneX = (t: string): number => {
+      const up = t.toUpperCase();
+      if (up.includes("VENDOR")) return 0;
+      if (up.includes("PURCHASEORDER") || up === "PO" || up.includes("POLINE")) return 280;
+      if (up.includes("GOODSRECEIPT") || up.includes("GRN") || up.includes("DOCUMENT")) return 570;
+      if (up.includes("INVOICE") || up.includes("RECONCILIATION")) return 860;
+      return 1150;
+    };
+    const laneCounts: Record<number, number> = {};
+    const focusQ = nodeFocusQuery.trim().toLowerCase();
 
-  const rfEdges: Edge[] = useMemo(
-    () =>
-      rawEdges
-        .filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target))
-        .map((e) => ({
+    return filteredNodes.map((n) => {
+      const x = laneX(n.type || "");
+      const row = laneCounts[x] || 0;
+      laneCounts[x] = row + 1;
+
+      const amt = Number(n.data?.exposure_amount || n.data?.total_amount || 0);
+      const width = amt >= 100000 ? 270 : amt >= 25000 ? 245 : 220;
+
+      const focusMatch =
+        Boolean(focusQ) &&
+        (`${n.type} ${n.label} ${n.source_id || ""}`.toLowerCase().includes(focusQ));
+
+      const activeId = hoveredNodeId || selectedNode?.id;
+      const isConnected = Boolean(
+        activeId &&
+          (activeId === n.id ||
+            rawEdges.some(
+              (e) =>
+                (e.source === activeId && e.target === n.id) ||
+                (e.target === activeId && e.source === n.id)
+            ))
+      );
+      const isHighlighted = Boolean(pathNodeIds.has(n.id) || isConnected || focusMatch);
+      const dimmed = Boolean((hoveredNodeId || focusQ) && !isHighlighted);
+
+      return {
+        id: n.id,
+        position: { x, y: row * 118 },
+        data: { label: `${n.type}: ${n.label}`, raw: n },
+        style: {
+          ...flowNodeStyle(n.type, isHighlighted),
+          width,
+          opacity: dimmed ? 0.28 : 1,
+          transition: "opacity 160ms ease, box-shadow 160ms ease",
+        },
+      };
+    });
+  }, [filteredNodes, selectedNode, hoveredNodeId, nodeFocusQuery, rawEdges, pathNodeIds]);
+
+  const rfEdges: Edge[] = useMemo(() => {
+    const activeId = hoveredNodeId || selectedNode?.id;
+    return rawEdges
+      .filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target))
+      .map((e) => {
+        const isConn = Boolean(activeId && (e.source === activeId || e.target === activeId));
+        const inPath = pathEdgeIds.has(e.id);
+        const amt = Number(e.data?.amount || e.data?.total_amount || 0);
+        const baseWidth = amt >= 100000 ? 3.5 : amt >= 25000 ? 2.5 : 1.5;
+        return {
           id: e.id,
           source: e.source,
           target: e.target,
           label: e.label,
+          animated: inPath || isConn,
           labelStyle: { fontSize: 10, fill: "var(--ink-500)", fontFamily: "JetBrains Mono, monospace" },
           markerEnd: { type: MarkerType.ArrowClosed },
-          style: flowEdgeStyle(false),
-        })),
-    [rawEdges, visibleNodeIds]
-  );
+          style: {
+            ...flowEdgeStyle(inPath || isConn),
+            strokeWidth: inPath || isConn ? Math.max(baseWidth, 2.5) : baseWidth,
+            opacity: hoveredNodeId && !isConn ? 0.2 : 1,
+          },
+        };
+      });
+  }, [rawEdges, visibleNodeIds, pathEdgeIds, hoveredNodeId, selectedNode]);
 
   const entityTypes = useMemo(
     () => ["ALL", ...Array.from(new Set(rawNodes.map((n) => n.type)))],
@@ -123,8 +202,12 @@ export const ObligationGraphPage: React.FC = () => {
     <div className="space-y-8">
       <Card variant="hero">
         <PageCaption
-          module="Intelligence / Relational Projection"
-          index="PostgreSQL Evidence Graph"
+          module="Intelligence / Neo4j Graph Engine"
+          index={
+            graphData?.source === "neo4j"
+              ? "Live Neo4j Cypher"
+              : "PostgreSQL Relational Projection"
+          }
         />
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -136,8 +219,8 @@ export const ObligationGraphPage: React.FC = () => {
               Financial Obligation Graph
             </h1>
             <p className="text-sm text-ink-700 mt-1">
-              Follow every commitment, receipt, invoice claim and approval through a connected
-              financial evidence network.
+              Neo4j-backed relationship traversal across suppliers, PO lines, multi-GRN receipts,
+              invoices, exceptions, and investigations.
             </p>
           </div>
 
@@ -145,15 +228,52 @@ export const ObligationGraphPage: React.FC = () => {
             value={viewMode}
             onChange={(val) => {
               setSelectedNode(null);
-              setViewMode(val as "obligation" | "evidence");
+              setPathResult(null);
+              setViewMode(val as "overview" | "evidence" | "vendor" | "fulfilment");
             }}
             options={[
-              { id: "obligation", label: "Obligation View" },
+              { id: "overview", label: "Obligation View" },
               { id: "evidence", label: "Evidence View" },
+              { id: "vendor", label: "Vendor Network" },
+              { id: "fulfilment", label: "Line Fulfilment" },
             ]}
           />
         </div>
       </Card>
+
+      {/* Neo4j Sync & Connectivity Bar */}
+      {graphHealth && (
+        <Card variant="subtle" className="py-3 px-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <StatusPill
+              value={graphHealth.sync_state}
+              tone={
+                graphHealth.sync_state === "CURRENT"
+                  ? "success"
+                  : graphHealth.sync_state === "DEGRADED"
+                    ? "danger"
+                    : "warning"
+              }
+            />
+            <span className="font-mono text-ink-700">
+              Backend: <strong>{graphHealth.graph_backend}</strong> • Nodes:{" "}
+              <strong>{graphHealth.nodes_synchronized}</strong> • Relationships:{" "}
+              <strong>{graphHealth.relationships_synchronized}</strong> • Pending Outbox:{" "}
+              <strong>{graphHealth.pending_events}</strong>
+            </span>
+          </div>
+          {hasPermission("admin:config:write") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => backfillMut.mutate()}
+              disabled={backfillMut.isPending}
+            >
+              {backfillMut.isPending ? "Syncing Neo4j..." : "Backfill Neo4j Graph"}
+            </Button>
+          )}
+        </Card>
+      )}
 
       {/* Controls & Filters */}
       <Card className="flex flex-wrap items-center gap-3 p-4">
@@ -170,6 +290,7 @@ export const ObligationGraphPage: React.FC = () => {
           value={activeTxId}
           onChange={(e) => {
             setSelectedNode(null);
+            setPathResult(null);
             setSelectedTxId(e.target.value);
           }}
           className="px-3 py-2 rounded-control border border-sand-200 text-xs bg-sand-50 text-ink-900 max-w-xs"
@@ -212,6 +333,7 @@ export const ObligationGraphPage: React.FC = () => {
             setStatusFilter("");
             setEntityFilter("ALL");
             setSelectedNode(null);
+            setPathResult(null);
           }}
         >
           Reset
@@ -230,7 +352,7 @@ export const ObligationGraphPage: React.FC = () => {
       </Card>
 
       {/* Deterministic Backend Obligation Summary */}
-      {viewMode === "obligation" && obSummary && obSummary.ordered_qty !== undefined && (
+      {obSummary && obSummary.ordered_qty !== undefined && (
         <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
           <Stat label="Ordered Qty" value={obSummary.ordered_qty} mono className="p-4" />
           <Stat label="Accepted Qty" value={obSummary.accepted_qty} mono tone="success" className="p-4" />
@@ -253,9 +375,112 @@ export const ObligationGraphPage: React.FC = () => {
         </div>
       )}
 
+      {/* Explain Financial Relationship (Neo4j shortestPath) */}
+      {rawNodes.length >= 2 && (
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-4 h-4 text-ink-900" />
+              <h2 className="font-display text-base font-bold text-ink-900">
+                Explain Financial Relationship (Neo4j Shortest Path)
+              </h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <select
+                aria-label="Path source node"
+                value={pathSrc}
+                onChange={(e) => setPathSrc(e.target.value)}
+                className="px-2.5 py-1.5 rounded-control border border-sand-200 bg-sand-50 max-w-[200px]"
+              >
+                <option value="">Select Start Node...</option>
+                {rawNodes.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.type}: {n.label}
+                  </option>
+                ))}
+              </select>
+              <span className="text-ink-500">→</span>
+              <select
+                aria-label="Path target node"
+                value={pathDst}
+                onChange={(e) => setPathDst(e.target.value)}
+                className="px-2.5 py-1.5 rounded-control border border-sand-200 bg-sand-50 max-w-[200px]"
+              >
+                <option value="">Select Target Node...</option>
+                {rawNodes.map((n) => (
+                  <option key={n.id} value={n.id}>
+                    {n.type}: {n.label}
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                disabled={!pathSrc || !pathDst || pathMut.isPending}
+                onClick={() => pathMut.mutate()}
+              >
+                {pathMut.isPending ? "Traversing..." : "Explain Path"}
+              </Button>
+            </div>
+          </div>
+
+          {pathResult && (
+            <div className="p-3.5 rounded-control bg-sand-50 border border-sand-200 text-xs space-y-2">
+              {!pathResult.path_found ? (
+                <div className="text-ink-700">{pathResult.message}</div>
+              ) : (
+                <div className="space-y-1.5 font-mono">
+                  <div className="text-[11px] uppercase tracking-[0.08em] text-ink-500 font-sans font-semibold">
+                    Verified Shortest Path ({pathResult.steps.length} hop(s) via Neo4j)
+                  </div>
+                  {pathResult.steps.map((st: any, idx: number) => (
+                    <div key={idx} className="flex flex-wrap items-center gap-2 text-ink-900">
+                      <span className="px-2 py-0.5 rounded bg-paper border border-sand-200">
+                        {st.from_type}: {st.from_label}
+                      </span>
+                      <span className="text-ink-500 font-semibold">—[{st.relationship}]→</span>
+                      <span className="px-2 py-0.5 rounded bg-paper border border-sand-200">
+                        {st.to_type}: {st.to_label}
+                      </span>
+                      <StatusPill value={st.verified ? "VERIFIED" : "INFERRED"} tone={st.verified ? "success" : "warning"} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Graph Canvas + Node Detail Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 space-y-3">
+          {/* Graph Legend & Search-to-Focus Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-sand-200">
+            <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-ink-500">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-ink-900" /> Vendor / PO
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-status-success-fg" /> GRN / Approval
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-status-warning-fg" /> Invoice
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-status-danger-fg" /> Exception
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-status-info-fg" /> Investigation
+              </span>
+            </div>
+            <input
+              aria-label="Search node to focus"
+              value={nodeFocusQuery}
+              onChange={(e) => setNodeFocusQuery(e.target.value)}
+              placeholder="Search node to focus..."
+              className="px-2.5 py-1 rounded-control border border-sand-200 bg-sand-50 text-xs font-mono text-ink-900 w-48"
+            />
+          </div>
           {txLoading || graphLoading ? (
             <PageSkeleton />
           ) : graphError ? (
@@ -276,6 +501,8 @@ export const ObligationGraphPage: React.FC = () => {
                   fitView
                   fitViewOptions={{ padding: 0.18 }}
                   onNodeClick={(_, node) => setSelectedNode((node.data as any)?.raw)}
+                  onNodeMouseEnter={(_, node) => setHoveredNodeId(node.id)}
+                  onNodeMouseLeave={() => setHoveredNodeId(null)}
                 >
                   <Background color="var(--sand-200)" gap={18} />
                   <Controls style={flowControlStyle} />
@@ -293,12 +520,15 @@ export const ObligationGraphPage: React.FC = () => {
                   </li>
                 ))}
               </ul>
-              <div className="flex flex-wrap gap-3 text-[11px] text-ink-500 pt-1">
-                <span>Legend (Left Edge):</span>
-                <span className="text-ink-900 font-semibold">■ PO / Obligation</span>
-                <span className="text-status-success-fg font-semibold">■ GRN / Approval</span>
-                <span className="text-status-warning-fg font-semibold">■ Invoice</span>
-                <span className="text-status-danger-fg font-semibold">■ Exception</span>
+              <div className="flex flex-wrap justify-between gap-3 text-[11px] text-ink-500 pt-1">
+                <div className="flex flex-wrap gap-3">
+                  <span>Legend (Left Edge):</span>
+                  <span className="text-ink-900 font-semibold">■ PO / Obligation</span>
+                  <span className="text-status-success-fg font-semibold">■ GRN / Approval</span>
+                  <span className="text-status-warning-fg font-semibold">■ Invoice</span>
+                  <span className="text-status-danger-fg font-semibold">■ Exception</span>
+                </div>
+                <span className="font-mono">Source: {graphData?.source || "neo4j"}</span>
               </div>
             </>
           )}
@@ -326,16 +556,54 @@ export const ObligationGraphPage: React.FC = () => {
             </div>
           ) : (
             <div className="text-xs text-ink-500">
-              Click any node in the graph to inspect its authoritative PostgreSQL fields and
-              relationships.
+              Click any node in the graph to inspect its Neo4j properties and source-linked
+              PostgreSQL identifiers.
             </div>
           )}
           <div className="pt-3 border-t border-sand-200 text-[11px] text-ink-500">
-            Payment settlement edges are omitted when no actual payment records exist in the
-            database.
+            Payment settlement edges are omitted when no actual payment records exist in
+            PostgreSQL.
           </div>
         </Card>
       </div>
+
+      {/* Graph-Based Risk Discovery */}
+      {riskDiscovery && (
+        <Card className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-status-info-fg" />
+              <h2 className="font-display text-lg font-bold text-ink-900">
+                Graph-Based Risk Discovery (Neo4j Pattern Traversal)
+              </h2>
+            </div>
+            <StatusPill value={riskDiscovery.disclaimer} tone="info" />
+          </div>
+          {!riskDiscovery.patterns?.length ? (
+            <div className="text-xs text-ink-500">
+              {riskDiscovery.degraded
+                ? "Neo4j is currently unavailable for cross-transaction pattern discovery."
+                : "No multi-transaction anomaly patterns detected in current graph."}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              {riskDiscovery.patterns.slice(0, 6).map((pat: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-card bg-sand-50 border border-sand-200 space-y-1"
+                >
+                  <div className="font-mono text-[10px] uppercase text-status-info-fg font-semibold">
+                    {pat.pattern_type}
+                  </div>
+                  <div className="font-semibold text-ink-900">{pat.title}</div>
+                  <div className="font-mono text-ink-700">{pat.evidence}</div>
+                  <div className="text-[11px] text-ink-500 pt-1">{pat.limitation}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 };

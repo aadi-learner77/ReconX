@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Copy, Play, Plus, Sliders } from "lucide-react";
+import { motion } from "framer-motion";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import {
+  Badge,
   Button,
   Card,
   Modal,
@@ -357,11 +359,27 @@ export const PolicyStudioPage: React.FC = () => {
         </Card>
 
         {editorOpen && (
-          <Card className="lg:col-span-5 space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="font-display text-lg font-bold text-ink-900">
-                {editingId ? `Edit Policy (${policyKey})` : "Create New Dynamic Policy"}
-              </h2>
+          <Card className="lg:col-span-12 space-y-5">
+            <div className="flex flex-wrap justify-between items-center gap-3 border-b border-sand-200 pb-3">
+              <div className="flex items-center gap-3">
+                <h2 className="font-display text-lg font-bold text-ink-900">
+                  {editingId ? `Edit Policy (${policyKey})` : "Create New Dynamic Policy"}
+                </h2>
+                <Badge
+                  value={
+                    editingId &&
+                    policies.find((p: any) => p.id === editingId)?.status === "ACTIVE"
+                      ? `Published · v${policies.find((p: any) => p.id === editingId)?.active_version}`
+                      : "Draft"
+                  }
+                  tone={
+                    editingId &&
+                    policies.find((p: any) => p.id === editingId)?.status === "ACTIVE"
+                      ? "success"
+                      : "warning"
+                  }
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setEditorOpen(false)}
@@ -371,164 +389,266 @@ export const PolicyStudioPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <label className="space-y-1">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-                  Policy Key
-                </span>
-                <input
-                  aria-label="Policy Key"
-                  value={policyKey}
-                  disabled={Boolean(editingId)}
-                  onChange={(e) => setPolicyKey(e.target.value)}
-                  className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 font-mono"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-                  Severity
-                </span>
-                <select
-                  aria-label="Severity"
-                  value={severity}
-                  onChange={(e) => setSeverity(e.target.value)}
-                  className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50"
-                >
-                  <option value="LOW">LOW</option>
-                  <option value="MEDIUM">MEDIUM</option>
-                  <option value="HIGH">HIGH</option>
-                  <option value="CRITICAL">CRITICAL</option>
-                </select>
-              </label>
-              <label className="space-y-1 sm:col-span-2">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-                  Policy Name
-                </span>
-                <input
-                  aria-label="Policy Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50"
-                />
-              </label>
-              <label className="space-y-1">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-                  Category
-                </span>
-                <select
-                  aria-label="Category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50"
-                >
-                  <option value="FINANCIAL">FINANCIAL</option>
-                  <option value="PROCUREMENT">PROCUREMENT</option>
-                  <option value="COMPLIANCE">COMPLIANCE</option>
-                  <option value="VENDOR">VENDOR</option>
-                  <option value="DUPLICATE">DUPLICATE</option>
-                </select>
-              </label>
-              <label className="space-y-1">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-                  Condition Metric
-                </span>
-                <select
-                  aria-label="Rule Field"
-                  value={field}
-                  onChange={(e) => setField(e.target.value)}
-                  className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 font-mono"
-                >
-                  {allowedFields.map((f) => (
-                    <option key={f} value={f}>
-                      IF {f}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-                  Operator
-                </span>
-                <select
-                  aria-label="Operator"
-                  value={operator}
-                  onChange={(e) => setOperator(e.target.value)}
-                  className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 font-mono"
-                >
-                  {allowedOps.map((op: string) => (
-                    <option key={op} value={op}>
-                      {op}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-                  Threshold Value
-                </span>
-                <input
-                  aria-label="Threshold Value"
-                  value={thresholdVal}
-                  onChange={(e) => setThresholdVal(e.target.value)}
-                  className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 font-mono"
-                />
-              </label>
-            </div>
-
-            <label className="block space-y-1 text-xs">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
-                Rule Description &amp; Investigation Guidance
-              </span>
-              <input
-                aria-label="Policy Description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 text-xs"
-              />
-            </label>
-
-            {/* Constrained DSL Preview */}
-            <div className="p-3 rounded-control bg-sand-100 border border-sand-200 font-mono text-[11px] text-ink-900 overflow-x-auto">
-              {JSON.stringify(buildDef(), null, 2)}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => previewMut.mutate()}
-                disabled={previewMut.isPending}
-              >
-                Preview Policy Impact (Dry-Run)
-              </Button>
-              <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
-                Save Policy Version
-              </Button>
-            </div>
-
-            {previewResult && (
-              <div className="p-3.5 rounded-control bg-sand-50 border border-sand-200 text-xs space-y-1.5">
-                <div className="font-bold text-ink-900">
-                  Dry-Run Projection — Scanned {previewResult.records_scanned} | Matching{" "}
-                  {previewResult.records_matching} | Potential New:{" "}
-                  {previewResult.potential_new_exceptions}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left: Rule Builder */}
+              <div className="space-y-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                  Rule Builder — Condition Rows &amp; Scope Chips
                 </div>
-                <div className="font-mono text-[11px] text-ink-500">
-                  Content Hash: {previewResult.content_hash}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge value={`IF ${field}`} tone="info" />
+                  <Badge value={operator} tone="neutral" />
+                  <Badge value={thresholdVal || "0"} tone="warning" />
+                  <Badge value={`THEN ${exceptionType}`} tone="danger" />
                 </div>
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {(previewResult.affected_transactions || []).slice(0, 8).map((tx: any) => (
-                    <Link
-                      key={tx.transaction_id}
-                      to={`/transactions/${tx.transaction_id}`}
-                      className="px-2 py-0.5 rounded-full bg-paper border border-sand-200 font-mono text-ink-900 underline"
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                      Policy Key
+                    </span>
+                    <input
+                      aria-label="Policy Key"
+                      value={policyKey}
+                      disabled={Boolean(editingId)}
+                      onChange={(e) => setPolicyKey(e.target.value)}
+                      className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 font-mono"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                      Severity
+                    </span>
+                    <select
+                      aria-label="Severity"
+                      value={severity}
+                      onChange={(e) => setSeverity(e.target.value)}
+                      className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50"
                     >
-                      {tx.po_number}
-                    </Link>
-                  ))}
+                      <option value="LOW">LOW</option>
+                      <option value="MEDIUM">MEDIUM</option>
+                      <option value="HIGH">HIGH</option>
+                      <option value="CRITICAL">CRITICAL</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1 sm:col-span-2">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                      Policy Name
+                    </span>
+                    <input
+                      aria-label="Policy Name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                      Category
+                    </span>
+                    <select
+                      aria-label="Category"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50"
+                    >
+                      <option value="FINANCIAL">FINANCIAL</option>
+                      <option value="PROCUREMENT">PROCUREMENT</option>
+                      <option value="COMPLIANCE">COMPLIANCE</option>
+                      <option value="VENDOR">VENDOR</option>
+                      <option value="DUPLICATE">DUPLICATE</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                      Condition Metric
+                    </span>
+                    <select
+                      aria-label="Rule Field"
+                      value={field}
+                      onChange={(e) => setField(e.target.value)}
+                      className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 font-mono"
+                    >
+                      {allowedFields.map((f) => (
+                        <option key={f} value={f}>
+                          IF {f}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                      Operator
+                    </span>
+                    <select
+                      aria-label="Operator"
+                      value={operator}
+                      onChange={(e) => setOperator(e.target.value)}
+                      className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 font-mono"
+                    >
+                      {allowedOps.map((op: string) => (
+                        <option key={op} value={op}>
+                          {op}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                      Threshold Value
+                    </span>
+                    <input
+                      aria-label="Threshold Value"
+                      value={thresholdVal}
+                      onChange={(e) => setThresholdVal(e.target.value)}
+                      className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 font-mono"
+                    />
+                  </label>
+                </div>
+
+                <label className="block space-y-1 text-xs">
+                  <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                    Rule Description &amp; Investigation Guidance
+                  </span>
+                  <input
+                    aria-label="Policy Description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full px-3 py-2 rounded-control border border-sand-200 bg-sand-50 text-xs"
+                  />
+                </label>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => previewMut.mutate()}
+                    disabled={previewMut.isPending}
+                  >
+                    Preview Policy Impact (Dry-Run)
+                  </Button>
+                  <Button size="sm" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+                    Save Policy Version
+                  </Button>
                 </div>
               </div>
-            )}
+
+              {/* Right: Live JSON/DSL Preview + Re-Audit Impact */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                    Live JSON / Constrained DSL Preview
+                  </span>
+                  <span className="font-mono text-[11px] text-ink-500">Deterministic Schema</span>
+                </div>
+                <pre className="p-4 rounded-card bg-sand-100 border border-sand-200 font-mono text-[11px] text-ink-900 overflow-x-auto leading-relaxed">
+                  {JSON.stringify(buildDef(), null, 2)}
+                </pre>
+
+                <div className="p-4 rounded-card bg-sand-50 border border-sand-200 text-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-display font-bold text-ink-900">Re-Audit Impact</span>
+                    <Badge
+                      value={previewResult ? "Dry-Run Ready" : "Click Preview Impact"}
+                      tone={previewResult ? "info" : "neutral"}
+                    />
+                  </div>
+                  {previewResult ? (
+                    <div className="space-y-2.5">
+                      <div className="font-bold text-ink-900">
+                        Dry-Run Projection — Scanned {previewResult.records_scanned} | Matching{" "}
+                        {previewResult.records_matching} | Potential New:{" "}
+                        {previewResult.potential_new_exceptions}
+                      </div>
+                      <div className="space-y-2">
+                        <div>
+                          <div className="flex justify-between font-mono text-[11px] text-ink-500 mb-1">
+                            <span>Before (Existing Exceptions)</span>
+                            <span>
+                              {Math.max(
+                                0,
+                                (previewResult.records_matching || 0) -
+                                  (previewResult.potential_new_exceptions || 0)
+                              )}
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full bg-sand-200 overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{
+                                width: `${
+                                  previewResult.records_scanned > 0
+                                    ? Math.min(
+                                        100,
+                                        Math.round(
+                                          (Math.max(
+                                            0,
+                                            (previewResult.records_matching || 0) -
+                                              (previewResult.potential_new_exceptions || 0)
+                                          ) /
+                                            previewResult.records_scanned) *
+                                            100
+                                        )
+                                      )
+                                    : 0
+                                }%`,
+                              }}
+                              transition={{ duration: 0.45 }}
+                              className="h-full bg-ink-700 rounded-full"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex justify-between font-mono text-[11px] text-status-danger-fg mb-1">
+                            <span>After (Projected Total Matching)</span>
+                            <span>{previewResult.records_matching}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-sand-200 overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{
+                                width: `${
+                                  previewResult.records_scanned > 0
+                                    ? Math.min(
+                                        100,
+                                        Math.round(
+                                          ((previewResult.records_matching || 0) /
+                                            previewResult.records_scanned) *
+                                            100
+                                        )
+                                      )
+                                    : 0
+                                }%`,
+                              }}
+                              transition={{ duration: 0.55 }}
+                              className="h-full bg-status-danger-fg rounded-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="font-mono text-[11px] text-ink-500">
+                        Content Hash: {previewResult.content_hash}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {(previewResult.affected_transactions || []).slice(0, 8).map((tx: any) => (
+                          <Link
+                            key={tx.transaction_id}
+                            to={`/transactions/${tx.transaction_id}`}
+                            className="px-2 py-0.5 rounded-full bg-paper border border-sand-200 font-mono text-ink-900 underline"
+                          >
+                            {tx.po_number}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-ink-500">
+                      Run &ldquo;Preview Policy Impact (Dry-Run)&rdquo; to compare before/after exception counts.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </Card>
         )}
       </div>

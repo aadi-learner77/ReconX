@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, getAccessToken } from "../api/client";
 import {
+  AmountCell,
   Button,
   Card,
   DataTable,
@@ -11,7 +12,6 @@ import {
   PageSkeleton,
   StatusPill,
 } from "../components/ui";
-import { formatInrString } from "../utils/money";
 
 export const TransactionsPage: React.FC = () => {
   const [page, setPage] = useState(1);
@@ -172,6 +172,7 @@ export const TransactionsPage: React.FC = () => {
         <PageSkeleton />
       ) : (
         <DataTable
+          showDensityToggle
           rows={data?.items || []}
           rowKey={(tx) => tx.transaction_id}
           empty={
@@ -201,7 +202,9 @@ export const TransactionsPage: React.FC = () => {
               header: "Total",
               align: "right",
               mono: true,
-              render: (tx) => formatInrString(tx.total_amount, tx.currency),
+              sortable: true,
+              sortValue: (tx) => Number(tx.total_amount || 0),
+              render: (tx) => <AmountCell amount={tx.total_amount} currency={tx.currency} />,
             },
             {
               key: "outcome",
