@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { StatusBadge } from "../components/StatusBadge";
+import { Card, EmptyState, PageCaption, Stat, StatusPill } from "../components/ui";
 
 export const VendorsPage: React.FC = () => {
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
@@ -14,81 +14,83 @@ export const VendorsPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Vendor Intelligence</h1>
-        <p className="text-sm text-slate-500">
+        <PageCaption module="Module / Vendor Intelligence" index="Small-Sample Guarded" />
+        <h1 className="font-display text-3xl font-bold text-ink-900">Vendor Intelligence</h1>
+        <p className="text-sm text-ink-500 mt-1">
           Historical performance metrics with disclosed date range and sample size N
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Suppliers</h2>
-          <ul className="divide-y divide-slate-100">
+        <Card className="lg:col-span-4">
+          <h2 className="font-display text-base font-bold text-ink-900 mb-3">Suppliers</h2>
+          <ul className="divide-y divide-sand-200">
             {(vendorsData?.items || []).map((v: any) => (
               <li key={v.id}>
                 <button
                   onClick={() => setSelectedVendorId(v.id)}
-                  className={`w-full text-left py-2.5 px-2 rounded-lg text-sm ${
-                    selectedVendorId === v.id ? "bg-indigo-50 font-semibold" : "hover:bg-slate-50"
+                  className={`w-full text-left py-3 px-2.5 rounded-control text-sm transition-colors ${
+                    selectedVendorId === v.id ? "bg-sand-100 font-semibold" : "hover:bg-sand-50"
                   }`}
                 >
-                  <div>{v.legal_name}</div>
-                  <div className="text-xs text-slate-500">{v.tax_identifier}</div>
+                  <div className="text-ink-900">{v.legal_name}</div>
+                  <div className="text-xs font-mono text-ink-500 mt-0.5">{v.tax_identifier}</div>
                 </button>
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
 
         <div className="lg:col-span-8">
           {!profile ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500">
-              Select a vendor to view profile, mismatch rate, and dispute history.
-            </div>
+            <EmptyState
+              title="Select a supplier"
+              description="Choose a supplier from the left list to view mismatch rate, delivery timeliness, and dispute history."
+            />
           ) : (
-            <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
+            <Card className="space-y-5">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">{profile.legal_name}</h2>
-                  <p className="text-xs text-slate-500">
+                  <h2 className="font-display text-2xl font-bold text-ink-900">
+                    {profile.legal_name}
+                  </h2>
+                  <p className="text-xs font-mono text-ink-500 mt-0.5">
                     Window: {profile.date_range.from} to {profile.date_range.to} • Sample N=
                     {profile.transaction_count}
                   </p>
                 </div>
-                <StatusBadge value={profile.status} />
+                <StatusPill value={profile.status} />
               </div>
 
               {profile.small_sample_warning && (
-                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
+                <div className="p-3.5 rounded-control bg-status-warning-bg border border-status-warning-fg/30 text-xs text-status-warning-fg font-medium">
                   {profile.small_sample_warning}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div className="p-3 rounded-lg bg-slate-50 border">
-                  <div className="text-xs text-slate-500">Transactions (N)</div>
-                  <div className="text-xl font-bold">{profile.transaction_count}</div>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-50 border">
-                  <div className="text-xs text-slate-500">Mismatch Rate</div>
-                  <div className="text-xl font-bold">{Math.round(profile.mismatch_rate * 100)}%</div>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-50 border">
-                  <div className="text-xs text-slate-500">Avg Delivery Days</div>
-                  <div className="text-xl font-bold">{profile.avg_delivery_days ?? "—"}</div>
-                </div>
-                <div className="p-3 rounded-lg bg-slate-50 border">
-                  <div className="text-xs text-slate-500">Reliability Indicator</div>
-                  <div className="text-xl font-bold">
-                    {profile.reliability_indicator !== null
-                      ? `${Math.round(profile.reliability_indicator * 100)}%`
-                      : "N/A (small N)"}
-                  </div>
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Stat label="Transactions (N)" value={profile.transaction_count} className="p-4" />
+                <Stat
+                  label="Mismatch Rate"
+                  value={`${Math.round(profile.mismatch_rate * 100)}%`}
+                  mono
+                  className="p-4"
+                />
+                <Stat
+                  label="Delivery Timeliness (Avg Days)"
+                  value={profile.avg_delivery_days ?? "—"}
+                  mono
+                  className="p-4"
+                />
+                <Stat
+                  label="Reliability Indicator"
+                  value={profile.reliability_score ?? "N/A (small N)"}
+                  className="p-4"
+                />
               </div>
-            </div>
+            </Card>
           )}
         </div>
       </div>

@@ -13,7 +13,7 @@ describe("ReconX Frontend Core Components", () => {
     render(<StatusBadge value="MATCHED_WITH_TOLERANCE" />);
     const badge = screen.getByTestId("status-badge");
     expect(badge).toHaveTextContent("MATCHED_WITH_TOLERANCE");
-    expect(badge.className).toContain("bg-teal-50");
+    expect(badge.className).toContain("bg-status-success-bg");
   });
 
   it("renders side-by-side diff table and rule breakdown on TransactionDetailPage", async () => {

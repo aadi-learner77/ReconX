@@ -1,9 +1,19 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ArrowUpRight, Sparkles } from "lucide-react";
 import { api } from "../api/client";
-import { StatusBadge } from "../components/StatusBadge";
+import {
+  Card,
+  DataTable,
+  EmptyState,
+  PageCaption,
+  PageSkeleton,
+  Stat,
+  StatusPill,
+} from "../components/ui";
+import { chartTheme, outcomeBarColor } from "../theme/chartTheme";
 
 export const DashboardPage: React.FC = () => {
   const { data, isLoading, error } = useQuery({
@@ -11,165 +21,183 @@ export const DashboardPage: React.FC = () => {
     queryFn: api.dashboardSummary,
   });
 
-  if (isLoading) return <div className="text-sm text-slate-500">Loading dashboard...</div>;
+  if (isLoading) return <PageSkeleton />;
   if (error || !data) {
     return (
-      <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 text-sm text-rose-800">
+      <Card className="border-status-danger-fg/30 bg-status-danger-bg text-status-danger-fg text-sm">
         Failed to load dashboard metrics.
-      </div>
+      </Card>
     );
   }
 
-  const kpis = [
-    { label: "Documents", value: data.kpis.documents },
-    { label: "Transactions", value: data.kpis.transactions },
-    { label: "Matched Cases", value: data.kpis.matched_cases },
-    { label: "Open Exceptions", value: data.kpis.open_exceptions },
-    { label: "Pending Approvals", value: data.kpis.pending_approvals },
-    { label: "Processing Jobs", value: data.kpis.processing_jobs },
-  ];
+  const totalTx = data.kpis.transactions || 0;
+  const matchedRate =
+    totalTx > 0 ? `${Math.round((data.kpis.matched_cases / totalTx) * 100)}%` : "0%";
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Finance Operations Dashboard</h1>
-          <p className="text-sm text-slate-500">
-            Three-way PO, GRN & invoice reconciliation overview
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Link
-            to="/documents"
-            className="px-3.5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
-          >
-            Upload Documents
-          </Link>
-          <Link
-            to="/transactions"
-            className="px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50"
-          >
-            View Transactions
-          </Link>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {kpis.map((k) => (
-          <div key={k.label} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-            <div className="text-xs font-medium text-slate-500">{k.label}</div>
-            <div className="text-2xl font-bold text-slate-900 mt-1">{k.value}</div>
+    <div className="space-y-10">
+      {/* Hero Band */}
+      <Card variant="hero">
+        <PageCaption
+          project="ReconX AI / Operations Console"
+          module="Module / Finance Operations"
+          index={`Active Tx / ${data.kpis.transactions}`}
+        />
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <h1 className="font-display text-3xl md:text-5xl font-bold text-ink-900">
+              Finance Operations Dashboard
+            </h1>
+            <p className="text-sm md:text-base text-ink-700 mt-2 max-w-2xl">
+              Three-way Purchase Order, Goods-Receipt &amp; Supplier Invoice reconciliation ledger.
+            </p>
           </div>
-        ))}
+          <div className="flex flex-wrap gap-3">
+            <Link
+              to="/documents"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-control bg-ink-900 text-on-ink text-sm font-medium hover:-translate-y-px transition-transform shadow-soft"
+            >
+              <span>Upload Documents</span>
+              <ArrowUpRight className="w-4 h-4" />
+            </Link>
+            <Link
+              to="/transactions"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-control border border-ink-900 text-ink-900 text-sm font-medium hover:bg-sand-100 transition-colors"
+            >
+              <span>View Transactions</span>
+            </Link>
+          </div>
+        </div>
+      </Card>
+
+      {/* Hero KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        <Stat label="Matched Rate" value={matchedRate} tone="success" hint={`${data.kpis.matched_cases} matched`} />
+        <Stat label="Documents" value={data.kpis.documents} />
+        <Stat label="Transactions" value={data.kpis.transactions} />
+        <Stat label="Open Exceptions" value={data.kpis.open_exceptions} tone="danger" />
+        <Stat label="Pending Approvals" value={data.kpis.pending_approvals} tone="warning" />
+        <Stat label="Processing Jobs" value={data.kpis.processing_jobs} />
       </div>
 
+      {/* Outcomes Chart + Exception Queue */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-4">Reconciliation Outcomes</h2>
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-lg font-bold text-ink-900">Reconciliation Outcomes</h2>
+            <span className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
+              Deterministic Engine
+            </span>
+          </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.outcome_breakdown}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="outcome" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#4f46e5" radius={[6, 6, 0, 0]} />
+                <CartesianGrid vertical={false} stroke={chartTheme.gridStroke} />
+                <XAxis dataKey="outcome" tick={chartTheme.axisTick} stroke={chartTheme.axisStroke} />
+                <YAxis allowDecimals={false} tick={chartTheme.axisTick} stroke={chartTheme.axisStroke} />
+                <Tooltip contentStyle={chartTheme.tooltipStyle} />
+                <Bar dataKey="count" radius={chartTheme.barRadius}>
+                  {data.outcome_breakdown.map((entry: any) => (
+                    <Cell key={entry.outcome} fill={outcomeBarColor(entry.outcome)} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-900">Exception Queue</h2>
-            <Link to="/exceptions" className="text-xs text-indigo-600 hover:underline">
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-lg font-bold text-ink-900">Exception Queue</h2>
+            <Link to="/exceptions" className="text-xs font-semibold text-ink-900 underline">
               View all
             </Link>
           </div>
           {data.exception_queue.length === 0 ? (
-            <div className="text-sm text-slate-500 py-8 text-center">
-              No open exceptions. Run reconciliation on transactions to inspect variances.
-            </div>
+            <EmptyState
+              title="No Open Exceptions"
+              description="Run reconciliation on transactions to inspect variances."
+            />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-sand-200">
               {data.exception_queue.map((e) => (
-                <li key={e.id} className="py-2.5 flex items-center justify-between gap-3">
+                <li key={e.id} className="py-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <Link
                       to={`/exceptions/${e.id}`}
-                      className="text-sm font-medium text-slate-900 hover:text-indigo-600 truncate block"
+                      className="text-sm font-semibold text-ink-900 hover:underline truncate block"
                     >
                       {e.type}
                     </Link>
-                    <p className="text-xs text-slate-500 truncate">{e.summary}</p>
+                    <p className="text-xs text-ink-500 truncate mt-0.5">{e.summary}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <StatusBadge value={e.severity} />
-                    <StatusBadge value={e.status} />
+                    <StatusPill value={e.severity} />
+                    <StatusPill value={e.status} />
                   </div>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </Card>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600">
-            AI assistance powered by Google Gemini API
+      {/* Gemini Intelligence Showcase Card */}
+      <Card variant="subtle" className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+            <Sparkles className="w-3.5 h-3.5 text-ink-900" aria-hidden="true" />
+            <span>AI Assistance Powered by Google Gemini API</span>
           </div>
-          <h2 className="text-base font-bold text-slate-900 mt-0.5">
+          <h2 className="font-display text-xl font-bold text-ink-900">
             Gemini-Powered Financial Intelligence
           </h2>
-          <p className="text-xs text-slate-600 mt-0.5 max-w-2xl">
-            Google Gemini API assists ReconX in contextual financial investigation while
-            deterministic reconciliation and evidence validation preserve financial correctness.
+          <p className="text-xs text-ink-700 max-w-2xl">
+            Google Gemini assists ReconX in contextual investigation while deterministic matching and
+            evidence validation preserve financial correctness.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs">
-          <div className="px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+          <div className="px-3.5 py-2 rounded-control bg-paper border border-sand-200 font-mono">
             Provider:{" "}
-            <strong className="uppercase text-indigo-700">
+            <strong className="uppercase text-ink-900">
               {data.ai_status?.configured_provider || "mock"}
             </strong>{" "}
             ({data.ai_status?.gemini_model || "gemini-2.5-flash"})
           </div>
           <Link
             to="/agent-harness"
-            className="px-3.5 py-2 rounded-lg border border-indigo-300 text-indigo-700 font-semibold hover:bg-indigo-50"
+            className="px-4 py-2 rounded-control border border-ink-900 text-ink-900 font-semibold hover:bg-paper transition-colors"
           >
             Open Agent Harness →
           </Link>
         </div>
-      </div>
+      </Card>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">Recent Audit Activity</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-slate-500 border-b">
-                <th className="py-2">Action</th>
-                <th className="py-2">Entity</th>
-                <th className="py-2">Actor</th>
-                <th className="py-2">Timestamp</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.recent_activity.map((a) => (
-                <tr key={a.id}>
-                  <td className="py-2 font-medium text-slate-800">{a.action}</td>
-                  <td className="py-2 text-slate-600">{a.entity_type}</td>
-                  <td className="py-2 text-slate-600">{a.actor_type}</td>
-                  <td className="py-2 text-slate-500 text-xs">
-                    {new Date(a.timestamp).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Recent Audit Activity */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-xl font-bold text-ink-900">Recent Audit Activity</h2>
+          <Link to="/audit" className="text-xs font-semibold text-ink-900 underline">
+            Open Audit Explorer
+          </Link>
         </div>
+        <DataTable
+          rowKey={(a) => a.id}
+          rows={data.recent_activity}
+          columns={[
+            { key: "action", header: "Action", render: (a) => <span className="font-semibold">{a.action}</span> },
+            { key: "entity", header: "Entity", mono: true, render: (a) => a.entity_type },
+            { key: "actor", header: "Actor", mono: true, render: (a) => a.actor_type },
+            {
+              key: "ts",
+              header: "Timestamp",
+              mono: true,
+              align: "right",
+              render: (a) => new Date(a.timestamp).toLocaleString(),
+            },
+          ]}
+        />
       </div>
     </div>
   );

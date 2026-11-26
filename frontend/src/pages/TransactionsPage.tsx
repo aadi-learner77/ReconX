@@ -2,7 +2,16 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, getAccessToken } from "../api/client";
-import { StatusBadge } from "../components/StatusBadge";
+import {
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  PageCaption,
+  PageSkeleton,
+  StatusPill,
+} from "../components/ui";
+import { formatInrString } from "../utils/money";
 
 export const TransactionsPage: React.FC = () => {
   const [page, setPage] = useState(1);
@@ -43,32 +52,32 @@ export const TransactionsPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const controlCls =
+    "rounded-control border border-sand-200 bg-sand-50 px-3 py-2 text-sm text-ink-900 focus:border-ink-900 focus:outline-none";
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Transactions</h1>
-          <p className="text-sm text-slate-500">
-            Filter by supplier, status, risk level, exception type, date or amount
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => downloadExport("csv")}
-            className="px-3 py-1.5 border border-slate-300 bg-white rounded-lg text-xs font-medium hover:bg-slate-50"
-          >
-            Export CSV
-          </button>
-          <button
-            onClick={() => downloadExport("pdf")}
-            className="px-3 py-1.5 border border-slate-300 bg-white rounded-lg text-xs font-medium hover:bg-slate-50"
-          >
-            Export PDF
-          </button>
+    <div className="space-y-8">
+      <div>
+        <PageCaption module="Module / Transactions Ledger" index="Three-Way Match Queue" />
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="font-display text-3xl font-bold text-ink-900">Transactions</h1>
+            <p className="text-sm text-ink-500 mt-1">
+              Filter by supplier, status, risk indicator level, exception type, date or amount
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => downloadExport("csv")}>
+              Export CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => downloadExport("pdf")}>
+              Export PDF
+            </Button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-3">
+      <Card className="grid grid-cols-2 md:grid-cols-5 gap-3 p-4">
         <input
           aria-label="Search PO or vendor"
           placeholder="Search PO / Vendor / Scenario..."
@@ -77,13 +86,13 @@ export const TransactionsPage: React.FC = () => {
             setPage(1);
             setFilters((f) => ({ ...f, search: e.target.value }));
           }}
-          className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className={controlCls}
         />
         <select
           aria-label="Supplier filter"
           value={filters.vendor_id}
           onChange={(e) => setFilters((f) => ({ ...f, vendor_id: e.target.value }))}
-          className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className={controlCls}
         >
           <option value="">All Suppliers</option>
           {(vendorsData?.items || []).map((v: any) => (
@@ -97,7 +106,7 @@ export const TransactionsPage: React.FC = () => {
           aria-label="Status filter"
           value={filters.status}
           onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
-          className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className={controlCls}
         >
           <option value="">All Statuses</option>
           <option value="OPEN">OPEN</option>
@@ -113,7 +122,7 @@ export const TransactionsPage: React.FC = () => {
           aria-label="Risk level filter"
           value={filters.risk_level}
           onChange={(e) => setFilters((f) => ({ ...f, risk_level: e.target.value }))}
-          className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className={controlCls}
         >
           <option value="">All Risk Levels</option>
           <option value="HIGH">HIGH</option>
@@ -126,7 +135,7 @@ export const TransactionsPage: React.FC = () => {
           placeholder="Exception type (e.g. QTY_OVER_BILLED)"
           value={filters.exception_type}
           onChange={(e) => setFilters((f) => ({ ...f, exception_type: e.target.value }))}
-          className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className={controlCls}
         />
 
         <input
@@ -134,99 +143,108 @@ export const TransactionsPage: React.FC = () => {
           aria-label="Date from"
           value={filters.date_from}
           onChange={(e) => setFilters((f) => ({ ...f, date_from: e.target.value }))}
-          className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className={controlCls}
         />
         <input
           type="date"
           aria-label="Date to"
           value={filters.date_to}
           onChange={(e) => setFilters((f) => ({ ...f, date_to: e.target.value }))}
-          className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className={controlCls}
         />
         <input
           type="number"
           placeholder="Min amount"
           value={filters.min_amount}
           onChange={(e) => setFilters((f) => ({ ...f, min_amount: e.target.value }))}
-          className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className={controlCls}
         />
         <input
           type="number"
           placeholder="Max amount"
           value={filters.max_amount}
           onChange={(e) => setFilters((f) => ({ ...f, max_amount: e.target.value }))}
-          className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className={controlCls}
         />
-      </div>
+      </Card>
 
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
-        {isLoading ? (
-          <div className="p-6 text-sm text-slate-500">Loading transactions...</div>
-        ) : !data?.items.length ? (
-          <div className="p-6 text-sm text-slate-500 text-center">No transactions match filters.</div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-slate-500 border-b bg-slate-50">
-                <th className="py-3 px-4">PO / Reference</th>
-                <th className="py-3 px-4">Vendor</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Total</th>
-                <th className="py-3 px-4">Outcome / Status</th>
-                <th className="py-3 px-4">Risk</th>
-                <th className="py-3 px-4">Scenario</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.items.map((tx) => (
-                <tr key={tx.transaction_id} className="hover:bg-slate-50">
-                  <td className="py-2.5 px-4 font-medium">
-                    <Link
-                      to={`/transactions/${tx.transaction_id}`}
-                      className="text-indigo-600 hover:underline"
-                    >
-                      {tx.po_number || `INV (${tx.transaction_id.slice(0, 8)})`}
-                    </Link>
-                  </td>
-                  <td className="py-2.5 px-4 text-slate-700">{tx.vendor_name}</td>
-                  <td className="py-2.5 px-4 text-slate-500">{tx.document_date}</td>
-                  <td className="py-2.5 px-4 font-mono">
-                    {tx.currency} {tx.total_amount}
-                  </td>
-                  <td className="py-2.5 px-4">
-                    <StatusBadge value={tx.latest_outcome || tx.status} />
-                  </td>
-                  <td className="py-2.5 px-4">
-                    <StatusBadge value={tx.risk_level} />
-                  </td>
-                  <td className="py-2.5 px-4 text-xs text-slate-500">{tx.scenario_label || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {isLoading ? (
+        <PageSkeleton />
+      ) : (
+        <DataTable
+          rows={data?.items || []}
+          rowKey={(tx) => tx.transaction_id}
+          empty={
+            <EmptyState
+              title="No matching transactions"
+              description="Adjust your filters to view purchase orders and invoices."
+            />
+          }
+          columns={[
+            {
+              key: "po",
+              header: "PO / Reference",
+              mono: true,
+              render: (tx) => (
+                <Link
+                  to={`/transactions/${tx.transaction_id}`}
+                  className="font-semibold text-ink-900 underline"
+                >
+                  {tx.po_number || `INV (${tx.transaction_id.slice(0, 8)})`}
+                </Link>
+              ),
+            },
+            { key: "vendor", header: "Vendor", render: (tx) => tx.vendor_name },
+            { key: "date", header: "Date", mono: true, render: (tx) => tx.document_date },
+            {
+              key: "total",
+              header: "Total",
+              align: "right",
+              mono: true,
+              render: (tx) => formatInrString(tx.total_amount, tx.currency),
+            },
+            {
+              key: "outcome",
+              header: "Outcome / Status",
+              render: (tx) => <StatusPill value={tx.latest_outcome || tx.status} />,
+            },
+            {
+              key: "risk",
+              header: "Risk Indicator",
+              render: (tx) => <StatusPill value={tx.risk_level} />,
+            },
+            {
+              key: "scenario",
+              header: "Scenario",
+              mono: true,
+              render: (tx) => tx.scenario_label || "—",
+            },
+          ]}
+        />
+      )}
 
       {data && data.total_pages > 1 && (
-        <div className="flex items-center justify-between text-xs text-slate-600">
-          <span>
+        <div className="flex items-center justify-between text-xs text-ink-500">
+          <span className="font-mono">
             Page {data.page} of {data.total_pages} ({data.total} total)
           </span>
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="px-3 py-1 border rounded bg-white disabled:opacity-40"
             >
               Previous
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               disabled={page >= data.total_pages}
               onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1 border rounded bg-white disabled:opacity-40"
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
       )}

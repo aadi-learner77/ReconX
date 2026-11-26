@@ -4,7 +4,17 @@ import { Link } from "react-router-dom";
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
-import { StatusBadge } from "../components/StatusBadge";
+import {
+  Button,
+  Card,
+  Drawer,
+  EmptyState,
+  PageCaption,
+  PageSkeleton,
+  Stat,
+  StatusPill,
+} from "../components/ui";
+import { formatInrString } from "../utils/money";
 
 export const ExecutiveBriefPage: React.FC = () => {
   const qc = useQueryClient();
@@ -12,6 +22,7 @@ export const ExecutiveBriefPage: React.FC = () => {
   const [scope, setScope] = useState("OPEN_EXCEPTIONS");
   const [auditRunId, setAuditRunId] = useState("");
   const [selectedBriefId, setSelectedBriefId] = useState<string>("");
+  const [selectedCitation, setSelectedCitation] = useState<any | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const { data: briefs = [], isLoading } = useQuery({
@@ -51,251 +62,277 @@ export const ExecutiveBriefPage: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-indigo-600 mb-1">
-            <FileText className="w-3.5 h-3.5" />
-            <span>Intelligence • Boardroom Reporting &amp; Citations</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Executive Boardroom Brief</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Generate evidence-cited CFO/auditor briefs with deterministic Decimal exposure and
-            traceable provenance.
-          </p>
-        </div>
+  const openCitationDrawer = (cid: string) => {
+    const found = (activeBrief?.citations || []).find((c: any) => c.citation_id === cid);
+    if (found) setSelectedCitation(found);
+  };
 
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            aria-label="Report Scope"
-            value={scope}
-            onChange={(e) => setScope(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white"
-          >
-            <option value="OPEN_EXCEPTIONS">Open Exceptions</option>
-            <option value="LATEST_RECONCILIATION">Latest Reconciliation Run</option>
-            <option value="POLICY_AUDIT_RUN">Selected Policy Re-Audit</option>
-          </select>
-          {audits.length > 0 && (
+  return (
+    <div className="space-y-8">
+      <Card variant="hero">
+        <PageCaption
+          module="Intelligence / Boardroom Reporting"
+          index="Deterministic Decimal Brief"
+        />
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <h1 className="font-display text-3xl md:text-5xl font-bold text-ink-900">
+              Executive Boardroom Brief
+            </h1>
+            <p className="text-sm text-ink-700 mt-2 max-w-2xl">
+              Generate evidence-cited CFO and auditor briefs with quantified Decimal exposure and
+              traceable database provenance.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
             <select
-              aria-label="Policy Audit Run"
-              value={auditRunId}
-              onChange={(e) => setAuditRunId(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white max-w-xs"
+              aria-label="Report Scope"
+              value={scope}
+              onChange={(e) => setScope(e.target.value)}
+              className="px-3 py-2 rounded-control border border-sand-200 text-xs bg-paper text-ink-900"
             >
-              <option value="">No Policy Audit Diff</option>
-              {audits.map((a: any) => (
-                <option key={a.id} value={a.id}>
-                  Audit {a.status} ({a.new_exceptions} new) — {a.started_at.slice(0, 16)}
-                </option>
-              ))}
+              <option value="OPEN_EXCEPTIONS">Open Exceptions</option>
+              <option value="LATEST_RECONCILIATION">Latest Reconciliation Run</option>
+              <option value="POLICY_AUDIT_RUN">Selected Policy Re-Audit</option>
             </select>
-          )}
-          {hasPermission("reports:generate") && (
-            <button
-              type="button"
-              onClick={() => genMut.mutate()}
-              disabled={genMut.isPending}
-              className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {genMut.isPending ? "Generating..." : "Generate Executive Brief"}
-            </button>
-          )}
+            {audits.length > 0 && (
+              <select
+                aria-label="Policy Audit Run"
+                value={auditRunId}
+                onChange={(e) => setAuditRunId(e.target.value)}
+                className="px-3 py-2 rounded-control border border-sand-200 text-xs bg-paper text-ink-900 max-w-xs"
+              >
+                <option value="">No Policy Audit Diff</option>
+                {audits.map((a: any) => (
+                  <option key={a.id} value={a.id}>
+                    Audit {a.status} ({a.new_exceptions} new) — {a.started_at.slice(0, 16)}
+                  </option>
+                ))}
+              </select>
+            )}
+            {hasPermission("reports:generate") && (
+              <Button onClick={() => genMut.mutate()} disabled={genMut.isPending}>
+                {genMut.isPending ? "Generating..." : "Generate Executive Brief"}
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
+      </Card>
 
       {err && (
-        <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800">
+        <Card className="border-status-danger-fg/30 bg-status-danger-bg text-status-danger-fg text-xs">
           {err}
-        </div>
+        </Card>
       )}
 
       {isLoading ? (
-        <div className="text-xs text-slate-500">Loading briefs...</div>
+        <PageSkeleton />
       ) : !activeBrief ? (
-        <div className="p-8 bg-white border border-dashed border-slate-300 rounded-xl text-center text-sm text-slate-500">
-          No executive briefs generated yet. Click <strong>Generate Executive Brief</strong> above.
-        </div>
+        <EmptyState
+          title="No executive briefs generated yet"
+          description="Click Generate Executive Brief above to assemble a cited boardroom summary."
+        />
       ) : (
-        <div className="space-y-6">
-          {/* Provenance & Export Bar */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs space-y-0.5">
-              <div className="font-bold text-slate-900">
-                Report ID: <span className="font-mono">{activeBrief.id}</span>
+        <div className="space-y-8">
+          {/* Editorial Reading Column */}
+          <div className="max-w-[760px] space-y-6">
+            <Card className="flex flex-wrap items-center justify-between gap-4">
+              <div className="text-xs space-y-1">
+                <div className="font-semibold text-ink-900">
+                  Report ID: <span className="font-mono">{activeBrief.id}</span>
+                </div>
+                <div className="text-ink-500 font-mono">
+                  Scope: {activeBrief.scope} • Checksum: {activeBrief.content_checksum.slice(0, 16)}
+                </div>
               </div>
-              <div className="text-slate-500">
-                Scope: {activeBrief.scope} • Checksum:{" "}
-                <span className="font-mono">{activeBrief.content_checksum.slice(0, 16)}</span>
-              </div>
-            </div>
-            {hasPermission("reports:download") && (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => triggerDownload("pdf")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export PDF</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => triggerDownload("markdown")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-800 hover:bg-slate-50"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Export Markdown</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => triggerDownload("csv")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-800 hover:bg-slate-50"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Export CSV</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Metrics & Financial Exposure */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="p-4 bg-white border border-slate-200 rounded-xl">
-              <div className="text-xs text-slate-500">Documents Processed</div>
-              <div className="text-xl font-bold text-slate-900">
-                {activeBrief.metrics.total_documents_processed}
-              </div>
-            </div>
-            <div className="p-4 bg-white border border-slate-200 rounded-xl">
-              <div className="text-xs text-slate-500">Transactions Evaluated</div>
-              <div className="text-xl font-bold text-slate-900">
-                {activeBrief.metrics.total_transactions_evaluated}
-              </div>
-            </div>
-            <div className="p-4 bg-white border border-slate-200 rounded-xl">
-              <div className="text-xs text-slate-500">Open Exceptions</div>
-              <div className="text-xl font-bold text-rose-700">
-                {activeBrief.metrics.total_open_exceptions}
-              </div>
-            </div>
-            <div className="p-4 bg-white border border-slate-200 rounded-xl">
-              <div className="text-xs text-slate-500">
-                Open Exposure ({activeBrief.exposure.currency})
-              </div>
-              <div className="text-xl font-bold text-rose-700">
-                {activeBrief.exposure.open_exception_exposure}
-              </div>
-            </div>
-          </div>
-
-          {/* Top 3 Urgent Exceptions */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Top Three Urgent Exceptions (Deterministic Ranking)
-            </h2>
-            {(activeBrief.top_exceptions || []).length === 0 ? (
-              <div className="text-xs text-slate-500">No open exceptions in scope.</div>
-            ) : (
-              <div className="space-y-3">
-                {activeBrief.top_exceptions.map((t: any, idx: number) => (
-                  <div
-                    key={t.exception_id}
-                    className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 text-xs space-y-1"
+              {hasPermission("reports:download") && (
+                <div className="inline-flex rounded-control border border-sand-200 bg-sand-100 p-1 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => triggerDownload("pdf")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] bg-ink-900 text-on-ink text-xs font-semibold"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-bold text-slate-900">
-                        #{idx + 1}{" "}
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export PDF</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerDownload("markdown")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-xs font-semibold text-ink-900 hover:bg-paper"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Export Markdown</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerDownload("csv")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-xs font-semibold text-ink-900 hover:bg-paper"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>Export CSV</span>
+                  </button>
+                </div>
+              )}
+            </Card>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <Stat label="Documents Processed" value={activeBrief.metrics.total_documents_processed} />
+              <Stat label="Transactions Evaluated" value={activeBrief.metrics.total_transactions_evaluated} />
+              <Stat label="Open Exceptions" value={activeBrief.metrics.total_open_exceptions} tone="danger" />
+              <Stat
+                label={`Open Exposure (${activeBrief.exposure.currency})`}
+                value={formatInrString(activeBrief.exposure.open_exception_exposure, activeBrief.exposure.currency)}
+                mono
+                tone="danger"
+              />
+            </div>
+
+            <Card className="space-y-4">
+              <h2 className="font-display text-xl font-bold text-ink-900">
+                Top Three Urgent Exceptions (Deterministic Ranking)
+              </h2>
+              {(activeBrief.top_exceptions || []).length === 0 ? (
+                <div className="text-xs text-ink-500">No open exceptions in scope.</div>
+              ) : (
+                <div className="space-y-3">
+                  {activeBrief.top_exceptions.map((t: any, idx: number) => (
+                    <div
+                      key={t.exception_id}
+                      className="p-4 rounded-card border border-sand-200 bg-sand-50 text-xs space-y-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-bold text-ink-900">
+                          #{idx + 1}{" "}
+                          <Link
+                            to={`/transactions/${t.transaction_id}`}
+                            className="font-mono underline"
+                          >
+                            {t.po_number}
+                          </Link>{" "}
+                          — {t.vendor_name}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StatusPill value={t.severity} />
+                          <span className="font-mono font-bold text-status-danger-fg">
+                            {formatInrString(t.financial_exposure, t.currency)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-ink-700">
+                        <strong>Why flagged ({t.rule_id}):</strong> {t.why_flagged}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
                         <Link
-                          to={`/transactions/${t.transaction_id}`}
-                          className="text-indigo-700 hover:underline"
+                          to={`/exceptions/${t.exception_id}`}
+                          className="text-ink-900 font-semibold underline mr-2"
                         >
-                          {t.po_number}
-                        </Link>{" "}
-                        — {t.vendor_name}
+                          Open Case →
+                        </Link>
+                        {(t.citation_ids || []).map((cid: string) => (
+                          <button
+                            key={cid}
+                            type="button"
+                            onClick={() => openCitationDrawer(cid)}
+                            className="px-2 py-0.5 rounded-full bg-paper border border-sand-200 hover:border-ink-900 font-mono text-ink-900"
+                          >
+                            [{cid}]
+                          </button>
+                        ))}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge value={t.severity} />
-                        <span className="font-mono font-bold text-rose-700">
-                          {t.currency} {t.financial_exposure}
-                        </span>
-                      </div>
                     </div>
-                    <div className="text-slate-700">
-                      <strong>Why flagged ({t.rule_id}):</strong> {t.why_flagged}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      <Link
-                        to={`/exceptions/${t.exception_id}`}
-                        className="text-indigo-700 font-semibold hover:underline"
-                      >
-                        Open Case →
-                      </Link>
-                      {(t.citation_ids || []).map((cid: string) => (
-                        <span
-                          key={cid}
-                          className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-800 font-mono"
-                        >
-                          {cid}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
 
-          {/* Verified Evidence Citations */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-2">
-            <h2 className="text-sm font-semibold text-slate-900">
+          {/* Verified Evidence Citations Table */}
+          <Card className="space-y-3">
+            <h2 className="font-display text-lg font-bold text-ink-900">
               Verified Source Citations ({(activeBrief.citations || []).length})
             </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+            <div className="overflow-x-auto rounded-card border border-sand-200">
+              <table className="w-full text-xs text-left font-mono">
+                <thead className="bg-sand-100 text-ink-500 border-b border-sand-200">
                   <tr>
-                    <th className="py-2 px-3">Citation ID</th>
-                    <th className="py-2 px-3">Source Type</th>
-                    <th className="py-2 px-3">Record</th>
-                    <th className="py-2 px-3">Field</th>
-                    <th className="py-2 px-3">Observed Value</th>
+                    <th scope="col" className="py-2.5 px-3">Citation ID</th>
+                    <th scope="col" className="py-2.5 px-3">Source Type</th>
+                    <th scope="col" className="py-2.5 px-3">Record</th>
+                    <th scope="col" className="py-2.5 px-3">Field</th>
+                    <th scope="col" className="py-2.5 px-3">Observed Value</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-sand-200">
                   {(activeBrief.citations || []).map((c: any) => (
-                    <tr key={c.citation_id}>
-                      <td className="py-2 px-3 font-mono font-semibold text-indigo-700">
+                    <tr
+                      key={c.citation_id}
+                      onClick={() => setSelectedCitation(c)}
+                      className="cursor-pointer hover:bg-sand-50"
+                    >
+                      <td className="py-2.5 px-3 font-semibold text-ink-900 underline">
                         {c.citation_id}
                       </td>
-                      <td className="py-2 px-3">{c.source_type}</td>
-                      <td className="py-2 px-3 font-mono">{c.source_display_id}</td>
-                      <td className="py-2 px-3">{c.source_field}</td>
-                      <td className="py-2 px-3 font-mono">{c.observed_value}</td>
+                      <td className="py-2.5 px-3 font-sans">{c.source_type}</td>
+                      <td className="py-2.5 px-3">{c.source_display_id}</td>
+                      <td className="py-2.5 px-3 font-sans">{c.source_field}</td>
+                      <td className="py-2.5 px-3">{c.observed_value}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
 
-          {/* Policy Diff & Historical Briefs */}
           {activeBrief.policy_diff && activeBrief.policy_diff.audit_run_id && (
-            <div className="bg-white border border-indigo-200 rounded-xl p-4 shadow-sm text-xs space-y-1">
-              <div className="font-bold text-indigo-900">
+            <Card variant="subtle" className="text-xs space-y-1">
+              <div className="font-bold text-ink-900">
                 What Changed After Policy Update (Audit {activeBrief.policy_diff.audit_run_id})
               </div>
-              <div>
+              <div className="font-mono text-ink-700">
                 Scanned: {activeBrief.policy_diff.transactions_scanned} | New Exceptions:{" "}
                 {activeBrief.policy_diff.new_exceptions} | Existing:{" "}
                 {activeBrief.policy_diff.existing_exceptions} | No Longer Triggered:{" "}
                 {activeBrief.policy_diff.resolved_exceptions}
               </div>
-            </div>
+            </Card>
           )}
         </div>
       )}
+
+      <Drawer
+        open={Boolean(selectedCitation)}
+        onClose={() => setSelectedCitation(null)}
+        title={selectedCitation ? `Citation ${selectedCitation.citation_id}` : "Citation"}
+        subtitle="Authoritative PostgreSQL Evidence Record"
+      >
+        {selectedCitation && (
+          <div className="space-y-3 text-xs">
+            <div className="p-3 rounded-control bg-sand-50 border border-sand-200 space-y-1.5">
+              <div>
+                <span className="text-ink-500">Source Type:</span>{" "}
+                <strong className="text-ink-900">{selectedCitation.source_type}</strong>
+              </div>
+              <div>
+                <span className="text-ink-500">Record:</span>{" "}
+                <span className="font-mono font-semibold text-ink-900">
+                  {selectedCitation.source_display_id}
+                </span>
+              </div>
+              <div>
+                <span className="text-ink-500">Field:</span>{" "}
+                <span className="font-mono text-ink-900">{selectedCitation.source_field}</span>
+              </div>
+              <div>
+                <span className="text-ink-500">Observed Value:</span>{" "}
+                <span className="font-mono font-bold text-ink-900">
+                  {selectedCitation.observed_value}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 };

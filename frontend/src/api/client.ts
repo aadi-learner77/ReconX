@@ -82,6 +82,11 @@ export const api = {
   dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
   listDocuments: (page = 1) => request<Paginated<DocumentItem>>(`/documents?page=${page}&page_size=25`),
   getDocument: (id: string) => request<DocumentItem>(`/documents/${id}`),
+  deleteDocument: (id: string) =>
+    request<{ deleted: boolean; document_id: string; reconciled_po_ids: string[] }>(
+      `/documents/${id}`,
+      { method: "DELETE" }
+    ),
   documentFileUrl: (id: string) => `${PREFIX}/documents/${id}/file`,
   uploadDocument: (file: File, hint?: string) => {
     const fd = new FormData();

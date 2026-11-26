@@ -1,10 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { UploadCloud } from "lucide-react";
+import { ShieldAlert, Trash2, UploadCloud } from "lucide-react";
 import { api, getAccessToken } from "../api/client";
 import type { DocumentItem, ExtractedFieldItem } from "../api/types";
-import { StatusBadge } from "../components/StatusBadge";
+import {
+  Button,
+  Card,
+  EmptyState,
+  PageCaption,
+  PageSkeleton,
+  StatusPill,
+  Toast,
+} from "../components/ui";
 
 export const DocumentsPage: React.FC = () => {
   const qc = useQueryClient();
@@ -16,6 +24,7 @@ export const DocumentsPage: React.FC = () => {
   const [previewPage, setPreviewPage] = useState<number>(1);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const { data: listData, isLoading } = useQuery({
     queryKey: ["documents"],
@@ -113,70 +122,89 @@ export const DocumentsPage: React.FC = () => {
     },
   });
 
+  const deleteMut = useMutation({
+    mutationFn: (docId: string) => api.deleteDocument(docId),
+    onSuccess: (res) => {
+      setConfirmDeleteId(null);
+      if (selectedDocId === res.document_id) {
+        setSelectedDocId(null);
+        setEdits({});
+      }
+      setBanner(
+        res.reconciled_po_ids.length
+          ? `Document deleted and ${res.reconciled_po_ids.length} linked transaction(s) re-reconciled.`
+          : "Document deleted and downstream records cleaned up."
+      );
+      qc.invalidateQueries({ queryKey: ["documents"] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["exceptions"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    },
+  });
+
   const handleFiles = (files: FileList | null) => {
     if (files && files[0]) {
       uploadMut.mutate(files[0]);
     }
   };
 
+  const validationWarningsField = docDetail?.fields.find(
+    (f) => f.name === "_validation_warnings"
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Document Workspace</h1>
-          <p className="text-sm text-slate-500">
-            Upload PO, GRN & Invoice files (PDF, PNG, JPG, XLSX, CSV) and review extracted fields
-          </p>
-        </div>
+    <div className="space-y-8">
+      <div>
+        <PageCaption module="Module / Evidence Ingestion" index="OCR & Verification" />
+        <h1 className="font-display text-3xl font-bold text-ink-900">Document Workspace</h1>
+        <p className="text-sm text-ink-500 mt-1">
+          Upload PO, GRN &amp; Invoice files (PDF, PNG, JPG, XLSX, CSV) and review extracted fields
+        </p>
       </div>
 
-      {banner && (
-        <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-sm text-indigo-900 flex justify-between">
-          <span>{banner}</span>
-          <button onClick={() => setBanner(null)} className="text-xs underline">
-            Dismiss
-          </button>
-        </div>
+      {banner && <Toast message={banner} tone="info" onDismiss={() => setBanner(null)} />}
+
+      {(uploadMut.isError || patchMut.isError || verifyMut.isError || deleteMut.isError) && (
+        <Card className="border-status-danger-fg/30 bg-status-danger-bg text-status-danger-fg text-sm">
+          {((uploadMut.error || patchMut.error || verifyMut.error || deleteMut.error) as Error).message}
+        </Card>
       )}
 
-      {(uploadMut.isError || patchMut.isError || verifyMut.isError) && (
-        <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-sm text-rose-800">
-          {((uploadMut.error || patchMut.error || verifyMut.error) as Error).message}
-        </div>
-      )}
-
+      {/* Drag & Drop Ingestion Zone */}
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
           handleFiles(e.dataTransfer.files);
         }}
-        className="bg-white border-2 border-dashed border-slate-300 rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4"
+        className="rounded-hero border-2 border-dashed border-sand-400 bg-paper p-6 md:p-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-soft"
       >
-        <div className="flex items-center gap-3">
-          <UploadCloud className="w-8 h-8 text-indigo-600" />
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-card bg-sand-100 text-ink-900">
+            <UploadCloud className="w-7 h-7" />
+          </div>
           <div>
-            <div className="text-sm font-semibold text-slate-900">
-              Drag & drop a document here, or browse
+            <div className="font-display text-base font-bold text-ink-900">
+              Drag &amp; drop a document here, or browse
             </div>
-            <div className="text-xs text-slate-500">
-              Max 15 MB • Magic-byte validated • Originals remain immutable
+            <div className="text-xs text-ink-500 mt-0.5">
+              Max 15 MB • Magic-byte validated • Originals remain immutable with SHA-256 checksums
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <select
             aria-label="Document type hint"
             value={hint}
             onChange={(e) => setHint(e.target.value)}
-            className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm"
+            className="border border-sand-200 bg-sand-50 rounded-control px-3 py-2 text-sm text-ink-900"
           >
             <option value="">Auto-classify</option>
             <option value="PO">PO</option>
             <option value="GRN">GRN</option>
             <option value="INVOICE">INVOICE</option>
           </select>
-          <label className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg cursor-pointer hover:bg-indigo-700">
+          <label className="px-4 py-2 bg-ink-900 text-on-ink text-sm font-medium rounded-control cursor-pointer hover:-translate-y-px transition-transform shadow-soft">
             Select File
             <input
               type="file"
@@ -189,21 +217,24 @@ export const DocumentsPage: React.FC = () => {
       </div>
 
       {activeJobId && jobStatus && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-900 flex items-center gap-2">
-          <span>Job {activeJobId.slice(0, 8)}:</span>
-          <StatusBadge value={jobStatus.status} />
-        </div>
+        <Card variant="subtle" className="py-3 px-4 text-sm flex items-center gap-3">
+          <span className="font-mono text-xs">Job {activeJobId.slice(0, 8)}:</span>
+          <StatusPill value={jobStatus.status} />
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Uploaded Documents</h2>
+        <Card className="lg:col-span-4">
+          <h2 className="font-display text-base font-bold text-ink-900 mb-3">Uploaded Documents</h2>
           {isLoading ? (
-            <div className="text-sm text-slate-500">Loading...</div>
+            <PageSkeleton />
           ) : !listData?.items.length ? (
-            <div className="text-sm text-slate-500 py-6 text-center">No documents uploaded yet.</div>
+            <EmptyState
+              title="No documents uploaded"
+              description="Drop a PO, GRN, or Invoice above to run extraction."
+            />
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-sand-200">
               {listData.items.map((d: DocumentItem) => (
                 <li key={d.document_id}>
                   <button
@@ -211,17 +242,17 @@ export const DocumentsPage: React.FC = () => {
                       setSelectedDocId(d.document_id);
                       setEdits({});
                     }}
-                    className={`w-full text-left py-2.5 px-2 rounded-lg transition ${
-                      selectedDocId === d.document_id ? "bg-indigo-50" : "hover:bg-slate-50"
+                    className={`w-full text-left py-3 px-2.5 rounded-control transition ${
+                      selectedDocId === d.document_id ? "bg-sand-100" : "hover:bg-sand-50"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-slate-900 truncate">
+                      <span className="text-sm font-semibold text-ink-900 truncate">
                         {d.file_name}
                       </span>
-                      <StatusBadge value={d.status} />
+                      <StatusPill value={d.status} />
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
+                    <div className="text-xs font-mono text-ink-500 mt-1">
                       {d.classification} ({Math.round(d.classification_confidence * 100)}%)
                     </div>
                   </button>
@@ -229,151 +260,216 @@ export const DocumentsPage: React.FC = () => {
               ))}
             </ul>
           )}
-        </div>
+        </Card>
 
         <div className="lg:col-span-8 space-y-4">
           {!docDetail ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-sm text-slate-500">
-              Select a document to preview file & inspect extracted fields.
-            </div>
+            <EmptyState
+              title="Select a document"
+              description="Choose a file from the left list to preview the original document and inspect OCR confidence."
+            />
           ) : (
-            <>
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <div>
-                    <h3 className="font-semibold text-slate-900">{docDetail.file_name}</h3>
-                    <p className="text-xs text-slate-500">
-                      Type: {docDetail.classification} • SHA-256: {docDetail.checksum.slice(0, 12)}...
-                      • Evidence Page: {previewPage}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge value={docDetail.status} />
-                    <button
-                      onClick={() => verifyMut.mutate()}
-                      disabled={verifyMut.isPending}
-                      className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700"
-                    >
-                      Verify & Commit
-                    </button>
-                    {docDetail.transaction_id && (
-                      <button
-                        onClick={() => navigate(`/transactions/${docDetail.transaction_id}`)}
-                        className="px-3 py-1.5 border border-slate-300 text-xs font-medium rounded-lg hover:bg-slate-50"
-                      >
-                        Open Transaction
-                      </button>
-                    )}
-                  </div>
+            <Card className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-display text-lg font-bold text-ink-900">
+                    {docDetail.file_name}
+                  </h3>
+                  <p className="text-xs font-mono text-ink-500 mt-0.5">
+                    Type: {docDetail.classification} • SHA-256: {docDetail.checksum.slice(0, 12)}...
+                    • Evidence Page: {previewPage}
+                  </p>
                 </div>
-
-                {docDetail.candidate_po_links && docDetail.candidate_po_links.length > 0 && (
-                  <div className="mb-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-slate-700">Candidate PO Links:</span>
-                    {docDetail.candidate_po_links.map((c) => (
-                      <button
-                        key={c.po_id}
-                        onClick={() => linkMut.mutate(c.po_id)}
-                        className="px-2 py-1 rounded bg-white border border-slate-300 hover:border-indigo-500"
-                      >
-                        Link {c.po_number} ({c.method}, {Math.round(c.score * 100)}%)
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {previewBlobUrl && docDetail.mime_type === "application/pdf" && (
-                  <iframe
-                    title="PDF Preview"
-                    src={`${previewBlobUrl}#page=${previewPage}`}
-                    className="w-full h-64 border border-slate-200 rounded-lg mb-4"
-                  />
-                )}
-                {previewBlobUrl && docDetail.mime_type.startsWith("image/") && (
-                  <img
-                    src={previewBlobUrl}
-                    alt={docDetail.file_name}
-                    className="max-h-64 border border-slate-200 rounded-lg mb-4 object-contain"
-                  />
-                )}
-
-                <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wide mb-2">
-                  Extracted Fields (click row to jump to evidence page)
-                </h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs text-slate-500 border-b">
-                        <th className="py-2">Field</th>
-                        <th className="py-2">Value</th>
-                        <th className="py-2">Confidence</th>
-                        <th className="py-2">Provenance</th>
-                        <th className="py-2">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {docDetail.fields
-                        .filter((f: ExtractedFieldItem) => f.name !== "line_items")
-                        .map((f: ExtractedFieldItem) => {
-                          const lowConf = f.confidence < 0.8 && f.verification_status === "extracted";
-                          const strVal =
-                            typeof f.value === "object" ? JSON.stringify(f.value) : String(f.value ?? "");
-                          return (
-                            <tr
-                              key={f.id}
-                              onClick={() => setPreviewPage(f.page)}
-                              className={`cursor-pointer ${lowConf ? "bg-amber-50/70" : "hover:bg-slate-50"}`}
-                            >
-                              <td className="py-2 font-medium text-slate-800">{f.name}</td>
-                              <td className="py-2">
-                                <input
-                                  aria-label={`Edit ${f.name}`}
-                                  value={edits[f.name] ?? strVal}
-                                  onChange={(e) =>
-                                    setEdits((prev) => ({ ...prev, [f.name]: e.target.value }))
-                                  }
-                                  className="border border-slate-300 rounded px-2 py-1 text-xs w-full"
-                                />
-                              </td>
-                              <td className="py-2 text-xs">
-                                <span
-                                  className={`font-semibold ${
-                                    lowConf ? "text-amber-700" : "text-emerald-700"
-                                  }`}
-                                >
-                                  {Math.round(f.confidence * 100)}%
-                                </span>
-                              </td>
-                              <td className="py-2 text-xs text-slate-500">
-                                p.{f.page} ({f.extraction_method})
-                              </td>
-                              <td className="py-2 text-xs">{f.verification_status}</td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {Object.keys(edits).length > 0 && (
-                  <div className="mt-3 flex justify-end">
-                    <button
-                      onClick={() =>
-                        patchMut.mutate(
-                          Object.entries(edits).map(([field_name, value]) => ({
-                            field_name,
-                            value,
-                          }))
-                        )
-                      }
-                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusPill value={docDetail.status} />
+                  <Button
+                    size="sm"
+                    onClick={() => verifyMut.mutate()}
+                    disabled={verifyMut.isPending}
+                  >
+                    Verify &amp; Commit
+                  </Button>
+                  {docDetail.transaction_id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/transactions/${docDetail.transaction_id}`)}
                     >
-                      Save Corrections
-                    </button>
-                  </div>
-                )}
+                      Open Transaction
+                    </Button>
+                  )}
+                  {confirmDeleteId === docDetail.document_id ? (
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteMut.mutate(docDetail.document_id)}
+                        disabled={deleteMut.isPending}
+                      >
+                        {deleteMut.isPending ? "Deleting..." : "Confirm Delete"}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setConfirmDeleteId(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setConfirmDeleteId(docDetail.document_id)}
+                      title="Delete document and clean up consequences"
+                      className="text-status-danger-fg border-status-danger-fg/30 hover:bg-status-danger-bg"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </Button>
+                  )}
+                </div>
               </div>
-            </>
+
+              {/* OCR Classification Confidence Meter */}
+              <div className="p-3 rounded-control bg-sand-50 border border-sand-200 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold uppercase tracking-[0.08em] text-ink-500 text-[11px]">
+                    OCR Classification Confidence
+                  </span>
+                  <span className="font-mono font-semibold text-ink-900">
+                    {Math.round(docDetail.classification_confidence * 100)}%
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-sand-200 overflow-hidden">
+                  <div
+                    className="h-full bg-ink-900 rounded-full transition-all"
+                    style={{ width: `${Math.round(docDetail.classification_confidence * 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {validationWarningsField && (
+                <div
+                  className="p-4 rounded-card border border-status-warning-fg/40 space-y-2"
+                  style={{ backgroundImage: "var(--untrusted-stripe)" }}
+                >
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-status-warning-fg">
+                    <ShieldAlert className="w-4 h-4" />
+                    <span>Untrusted Document Content — Validation Notice</span>
+                  </div>
+                  <pre className="font-mono text-xs text-ink-900 whitespace-pre-wrap">
+                    {JSON.stringify(validationWarningsField.value, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {docDetail.candidate_po_links && docDetail.candidate_po_links.length > 0 && (
+                <div className="p-3 rounded-control bg-sand-50 border border-sand-200 text-xs flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-ink-700">Candidate PO Links:</span>
+                  {docDetail.candidate_po_links.map((c) => (
+                    <button
+                      key={c.po_id}
+                      onClick={() => linkMut.mutate(c.po_id)}
+                      className="px-2.5 py-1 rounded-full bg-paper border border-sand-200 hover:border-ink-900 font-mono"
+                    >
+                      Link {c.po_number} ({c.method}, {Math.round(c.score * 100)}%)
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {previewBlobUrl && docDetail.mime_type === "application/pdf" && (
+                <iframe
+                  title="PDF Preview"
+                  src={`${previewBlobUrl}#page=${previewPage}`}
+                  className="w-full h-64 border border-sand-200 rounded-card"
+                />
+              )}
+              {previewBlobUrl && docDetail.mime_type.startsWith("image/") && (
+                <img
+                  src={previewBlobUrl}
+                  alt={docDetail.file_name}
+                  className="max-h-64 border border-sand-200 rounded-card object-contain"
+                />
+              )}
+
+              <h4 className="text-[11px] font-semibold text-ink-500 uppercase tracking-[0.08em]">
+                Extracted Fields (click row to jump to evidence page)
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-[0.08em] text-ink-500 border-b border-sand-200">
+                      <th scope="col" className="py-2">Field</th>
+                      <th scope="col" className="py-2">Value</th>
+                      <th scope="col" className="py-2">Confidence</th>
+                      <th scope="col" className="py-2">Provenance</th>
+                      <th scope="col" className="py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-sand-200">
+                    {docDetail.fields
+                      .filter(
+                        (f: ExtractedFieldItem) =>
+                          f.name !== "line_items" && f.name !== "_validation_warnings"
+                      )
+                      .map((f: ExtractedFieldItem) => {
+                        const lowConf = f.confidence < 0.8 && f.verification_status === "extracted";
+                        const strVal =
+                          typeof f.value === "object" ? JSON.stringify(f.value) : String(f.value ?? "");
+                        return (
+                          <tr
+                            key={f.id}
+                            onClick={() => setPreviewPage(f.page)}
+                            className={`cursor-pointer ${
+                              lowConf ? "bg-status-warning-bg/55" : "hover:bg-sand-50"
+                            }`}
+                          >
+                            <td className="py-2.5 font-medium text-ink-900">{f.name}</td>
+                            <td className="py-2.5">
+                              <input
+                                aria-label={`Edit ${f.name}`}
+                                value={edits[f.name] ?? strVal}
+                                onChange={(e) =>
+                                  setEdits((prev) => ({ ...prev, [f.name]: e.target.value }))
+                                }
+                                className="border border-sand-200 bg-paper rounded-control px-2.5 py-1 text-xs font-mono w-full focus:border-ink-900 focus:outline-none"
+                              />
+                            </td>
+                            <td className="py-2.5 text-xs font-mono">
+                              <span
+                                className={`font-semibold ${
+                                  lowConf ? "text-status-warning-fg" : "text-status-success-fg"
+                                }`}
+                              >
+                                {Math.round(f.confidence * 100)}%
+                              </span>
+                            </td>
+                            <td className="py-2.5 text-xs font-mono text-ink-500">
+                              p.{f.page} ({f.extraction_method})
+                            </td>
+                            <td className="py-2.5 text-xs">{f.verification_status}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+
+              {Object.keys(edits).length > 0 && (
+                <div className="pt-2 flex justify-end">
+                  <Button
+                    onClick={() =>
+                      patchMut.mutate(
+                        Object.entries(edits).map(([field_name, value]) => ({
+                          field_name,
+                          value,
+                        }))
+                      )
+                    }
+                  >
+                    Save Corrections
+                  </Button>
+                </div>
+              )}
+            </Card>
           )}
         </div>
       </div>

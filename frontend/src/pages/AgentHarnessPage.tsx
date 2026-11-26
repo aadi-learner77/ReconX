@@ -5,19 +5,18 @@ import "reactflow/dist/style.css";
 import { Cpu, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
 import { api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
-import { StatusBadge } from "../components/StatusBadge";
-
-const CATEGORY_STYLE: Record<string, { bg: string; border: string; color: string }> = {
-  orchestrator: { bg: "#0f172a", border: "#334155", color: "#f8fafc" },
-  ingestion: { bg: "#eff6ff", border: "#3b82f6", color: "#1e3a8a" },
-  reconciliation: { bg: "#ecfdf5", border: "#10b981", color: "#065f46" },
-  risk: { bg: "#fffbeb", border: "#f59e0b", color: "#78350f" },
-  vendor: { bg: "#f5f3ff", border: "#8b5cf6", color: "#4c1d95" },
-  graph: { bg: "#ecfeff", border: "#06b6d4", color: "#164e63" },
-  llm: { bg: "#eef2ff", border: "#6366f1", color: "#312e81" },
-  audit: { bg: "#f1f5f9", border: "#64748b", color: "#0f172a" },
-  gate: { bg: "#fef2f2", border: "#ef4444", color: "#7f1d1d" },
-};
+import {
+  Button,
+  Card,
+  EmptyState,
+  PageCaption,
+  PageSkeleton,
+  Stat,
+  StatusPill,
+  Stepper,
+  type StepItem,
+} from "../components/ui";
+import { flowControlStyle, flowEdgeStyle, flowNodeStyle } from "../theme/flowTheme";
 
 export const AgentHarnessPage: React.FC = () => {
   const { hasPermission } = useAuth();
@@ -56,6 +55,26 @@ export const AgentHarnessPage: React.FC = () => {
     [agents, selectedAgentId]
   );
 
+  const stepperItems: StepItem[] = useMemo(() => {
+    const traceMap = new Map<string, string>(
+      ((activeTrace?.execution_trace as any[]) || []).map((st) => [st.agent, st.status])
+    );
+    const items: StepItem[] = agents.map((a) => {
+      const st = (traceMap.get(a.id) || traceMap.get(a.name) || "").toUpperCase();
+      const state: StepItem["state"] =
+        st === "FALLBACK"
+          ? "fallback"
+          : st === "RUNNING"
+            ? "running"
+            : st === "DONE" || st === "SUCCEEDED" || st === "COMPLETED"
+              ? "done"
+              : "idle";
+      return { id: a.id, label: `${a.order}. ${a.name}`, state };
+    });
+    items.push({ id: "HumanApprovalGate", label: "Human Approval Gate", state: "idle" });
+    return items;
+  }, [agents, activeTrace]);
+
   const { rfNodes, rfEdges } = useMemo(() => {
     const chain = [
       { id: "FinanceOrchestrator", label: "Finance Orchestrator", category: "orchestrator" },
@@ -66,128 +85,107 @@ export const AgentHarnessPage: React.FC = () => {
         category: "gate",
       },
     ];
-    const nodes: Node[] = chain.map((item, idx) => {
-      const st = CATEGORY_STYLE[item.category] || CATEGORY_STYLE.audit;
-      return {
-        id: item.id,
-        position: { x: (idx % 3) * 260, y: Math.floor(idx / 3) * 110 },
-        data: { label: item.label },
-        style: {
-          background: st.bg,
-          border: `2px solid ${st.border}`,
-          color: st.color,
-          borderRadius: 10,
-          fontSize: 12,
-          fontWeight: 600,
-          width: 225,
-          padding: 10,
-        },
-      };
-    });
+    const nodes: Node[] = chain.map((item, idx) => ({
+      id: item.id,
+      position: { x: (idx % 3) * 260, y: Math.floor(idx / 3) * 115 },
+      data: { label: item.label },
+      style: flowNodeStyle(item.category, selectedAgentId === item.id),
+    }));
     const edges: Edge[] = chain.slice(0, -1).map((item, idx) => ({
       id: `e-${item.id}-${chain[idx + 1].id}`,
       source: item.id,
       target: chain[idx + 1].id,
       markerEnd: { type: MarkerType.ArrowClosed },
-      style: { stroke: "#64748b" },
+      style: flowEdgeStyle(false),
     }));
     return { rfNodes: nodes, rfEdges: edges };
-  }, [agents]);
+  }, [agents, selectedAgentId]);
 
-  if (isLoading) return <div className="text-sm text-slate-500">Loading Agent Harness...</div>;
+  if (isLoading) return <PageSkeleton />;
   if (error || !data) {
     return (
-      <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 text-sm text-rose-800">
+      <Card className="border-status-danger-fg/30 bg-status-danger-bg text-status-danger-fg text-sm">
         Unable to load Agent Harness overview.
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Section 1: Hero */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-indigo-600 mb-1">
-              <Cpu className="w-3.5 h-3.5" />
-              <span>Intelligence • Governance &amp; Orchestration Layer</span>
+    <div className="space-y-8">
+      {/* Hero */}
+      <Card variant="hero">
+        <PageCaption
+          module="Intelligence / Governance & Orchestration"
+          index="7-Stage Evidence Harness"
+        />
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500 mb-1">
+              <Cpu className="w-3.5 h-3.5 text-ink-900" />
+              <span>Evidence-Driven Orchestration Layer</span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="font-display text-3xl md:text-4xl font-bold text-ink-900">
               Inside the ReconX Intelligence Engine
             </h1>
-            <p className="text-sm text-slate-600 mt-1">
-              An evidence-driven multi-agent harness that coordinates financial analysis,
-              investigation and controlled decision workflows. The agent harness itself is the
-              execution and governance layer—not an eighth agent.
+            <p className="text-sm text-ink-700 mt-2">
+              Coordinates financial analysis, investigation, and controlled decision workflows. The
+              agent harness itself is the execution and governance layer — not an eighth agent.
             </p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-center">
-            <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-xs text-slate-500">Agents</div>
-              <div className="text-lg font-bold text-slate-900">{sys.configured_agents}</div>
-            </div>
-            <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-xs text-slate-500">Runs</div>
-              <div className="text-lg font-bold text-slate-900">{sys.total_investigations}</div>
-            </div>
-            <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-xs text-slate-500">Succeeded</div>
-              <div className="text-lg font-bold text-emerald-700">
-                {sys.successful_investigations}
-              </div>
-            </div>
-            <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-xs text-slate-500">Provider</div>
-              <div className="text-sm font-bold text-indigo-700 uppercase">
-                {sys.active_provider}
-              </div>
-            </div>
-            <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-xs text-slate-500">Graph</div>
-              <div className="text-sm font-bold text-slate-900">
-                {sys.graph_available ? "ENABLED" : "DISABLED"}
-              </div>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <Stat label="Agents" value={sys.configured_agents} className="p-3.5" />
+            <Stat label="Runs" value={sys.total_investigations} className="p-3.5" />
+            <Stat label="Succeeded" value={sys.successful_investigations} tone="success" className="p-3.5" />
+            <Stat label="Provider" value={String(sys.active_provider).toUpperCase()} mono className="p-3.5" />
+            <Stat label="Graph" value={sys.graph_available ? "ON" : "OFF"} mono className="p-3.5" />
           </div>
         </div>
-      </div>
+      </Card>
+
+      {/* Horizontal 7-Stage Stepper */}
+      <Card className="space-y-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+          Seven-Stage Execution Pipeline + Human Gate
+        </div>
+        <Stepper
+          steps={stepperItems}
+          activeId={selectedAgentId}
+          onSelect={(id) => {
+            if (agents.some((a) => a.id === id)) setSelectedAgentId(id);
+          }}
+        />
+      </Card>
 
       {/* Google Gemini Integration Showcase */}
       {gtel && (
-        <div className="bg-white border border-indigo-200 rounded-xl p-5 shadow-sm space-y-4">
+        <Card className="space-y-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-indigo-600">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>AI assistance powered by Google Gemini API</span>
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-500">
+                <Sparkles className="w-3.5 h-3.5 text-ink-900" />
+                <span>AI Assistance Powered by Google Gemini API</span>
               </div>
-              <h2 className="text-lg font-bold text-slate-900 mt-0.5">
+              <h2 className="font-display text-2xl font-bold text-ink-900 mt-0.5">
                 Google Gemini Integration
               </h2>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Document Evidence → Deterministic Finance Engine → Gemini-assisted Investigation →
-                Evidence Validation → Human Approval
+              <p className="text-xs text-ink-700 mt-1 font-mono">
+                Document Evidence → Deterministic Finance Engine → Gemini Investigation → Evidence
+                Validation → Human Approval
               </p>
             </div>
             {hasPermission("admin:config:write") && (
-              <button
-                type="button"
-                onClick={() => testGeminiMut.mutate()}
-                disabled={testGeminiMut.isPending}
-                className="px-3.5 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50"
-              >
+              <Button onClick={() => testGeminiMut.mutate()} disabled={testGeminiMut.isPending}>
                 {testGeminiMut.isPending ? "Testing Gemini..." : "Test Gemini Connection"}
-              </button>
+              </Button>
             )}
           </div>
 
           {testResult && (
             <div
-              className={`p-3 rounded-lg border text-xs ${
+              className={`p-3.5 rounded-control border text-xs font-mono ${
                 testResult.connected
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-900"
-                  : "bg-amber-50 border-amber-200 text-amber-900"
+                  ? "bg-status-success-bg border-status-success-fg/30 text-status-success-fg"
+                  : "bg-status-warning-bg border-status-warning-fg/30 text-status-warning-fg"
               }`}
             >
               <strong>{testResult.connected ? "Connected" : "Connection Failed"}:</strong>{" "}
@@ -196,72 +194,74 @@ export const AgentHarnessPage: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-xs">
-            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-slate-500">Gemini Model</div>
-              <div className="font-bold text-slate-900 truncate">{gtel.gemini_model}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
+            <div className="p-3 rounded-control bg-sand-50 border border-sand-200">
+              <div className="text-ink-500">Gemini Model</div>
+              <div className="font-mono font-bold text-ink-900 truncate mt-1">{gtel.gemini_model}</div>
             </div>
-            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-slate-500">Configured / Key</div>
-              <div className="font-bold text-slate-900 uppercase">
+            <div className="p-3 rounded-control bg-sand-50 border border-sand-200">
+              <div className="text-ink-500">Configured / Key</div>
+              <div className="font-mono font-bold text-ink-900 uppercase mt-1">
                 {gtel.configured_provider} ({gtel.api_key_configured ? "Key Set" : "No Key"})
               </div>
             </div>
-            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-slate-500">Invocations</div>
-              <div className="font-bold text-slate-900">{gtel.invocation_count}</div>
+            <div className="p-3 rounded-control bg-sand-50 border border-sand-200">
+              <div className="text-ink-500">Invocations</div>
+              <div className="font-mono font-bold text-ink-900 mt-1">{gtel.invocation_count}</div>
             </div>
-            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-slate-500">Succeeded</div>
-              <div className="font-bold text-emerald-700">{gtel.successful_calls}</div>
+            <div className="p-3 rounded-control bg-sand-50 border border-sand-200">
+              <div className="text-ink-500">Succeeded</div>
+              <div className="font-mono font-bold text-status-success-fg mt-1">
+                {gtel.successful_calls}
+              </div>
             </div>
-            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-slate-500">Failed / Fallback</div>
-              <div className="font-bold text-amber-700">
+            <div className="p-3 rounded-control bg-sand-50 border border-sand-200">
+              <div className="text-ink-500">Failed / Fallback</div>
+              <div className="font-mono font-bold text-status-warning-fg mt-1">
                 {gtel.failed_calls} / {gtel.fallback_count}
               </div>
             </div>
-            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-slate-500">Avg Latency</div>
-              <div className="font-bold text-slate-900">{gtel.avg_latency_ms} ms</div>
+            <div className="p-3 rounded-control bg-sand-50 border border-sand-200">
+              <div className="text-ink-500">Avg Latency</div>
+              <div className="font-mono font-bold text-ink-900 mt-1">{gtel.avg_latency_ms} ms</div>
             </div>
-            <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-slate-500">Token Usage</div>
-              <div className="font-semibold text-slate-600">Unavailable</div>
+            <div className="p-3 rounded-control bg-sand-50 border border-sand-200">
+              <div className="text-ink-500">Token Usage</div>
+              <div className="font-mono font-semibold text-ink-500 mt-1">Unavailable</div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="p-3 rounded-lg bg-indigo-50/50 border border-indigo-100">
-              <div className="font-bold text-indigo-900 mb-1">Where Gemini Assists</div>
-              <ul className="list-disc pl-4 text-slate-700 space-y-0.5">
+            <div className="p-4 rounded-card bg-sand-50 border border-sand-200">
+              <div className="font-semibold text-ink-900 mb-1.5">Where Gemini Assists</div>
+              <ul className="list-disc pl-4 text-ink-700 space-y-1">
                 <li>Natural-language investigation summaries over DB-verified facts</li>
                 <li>Contextual interpretation of discrepancies and vendor history</li>
                 <li>Clearly labeled unverified hypotheses and recommended next steps</li>
               </ul>
             </div>
-            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="font-bold text-slate-900 mb-1">What Gemini Never Does</div>
-              <ul className="list-disc pl-4 text-slate-700 space-y-0.5">
+            <div className="p-4 rounded-card bg-sand-100 border border-sand-200">
+              <div className="font-semibold text-ink-900 mb-1.5">What Gemini Never Does</div>
+              <ul className="list-disc pl-4 text-ink-700 space-y-1">
                 <li>Never calculates authoritative totals or overrides 3-way matching</li>
                 <li>Never creates unvalidated evidence refs, approves invoices, or pays</li>
                 <li>Never bypasses RBAC, maker-checker, or audit immutability</li>
               </ul>
             </div>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* Section 2: Interactive Agent Architecture + Right Inspector */}
+      {/* Interactive Agent Architecture + Right Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-1">
+        <Card className="lg:col-span-2">
+          <h2 className="font-display text-lg font-bold text-ink-900 mb-1">
             Seven-Stage Investigation Pipeline (Click an Agent Node to Inspect)
           </h2>
-          <p className="text-xs text-slate-500 mb-3">
-            Verified order in <code>FinanceOrchestrator.run_pipeline()</code>
+          <p className="text-xs text-ink-500 mb-3">
+            Verified order in <code className="font-mono">FinanceOrchestrator.run_pipeline()</code>
           </p>
-          <div className="hidden sm:block h-80 border border-slate-200 rounded-lg">
+          <div className="hidden sm:block h-80 border border-sand-200 rounded-card bg-sand-50 overflow-hidden">
             <ReactFlow
               nodes={rfNodes}
               edges={rfEdges}
@@ -272,8 +272,8 @@ export const AgentHarnessPage: React.FC = () => {
                 }
               }}
             >
-              <Background />
-              <Controls />
+              <Background color="var(--sand-200)" gap={18} />
+              <Controls style={flowControlStyle} />
             </ReactFlow>
           </div>
           <ol className="sm:hidden space-y-2 text-xs">
@@ -281,101 +281,81 @@ export const AgentHarnessPage: React.FC = () => {
               <li
                 key={a.id}
                 onClick={() => setSelectedAgentId(a.id)}
-                className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 font-medium"
+                className="p-2.5 rounded-control border border-sand-200 bg-sand-50 font-medium"
               >
                 {a.order}. {a.name}
               </li>
             ))}
           </ol>
-        </div>
+        </Card>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-2">Agent Inspector</h2>
+        <Card>
+          <h2 className="font-display text-lg font-bold text-ink-900 mb-3">Agent Inspector</h2>
           {selectedAgent ? (
-            <div className="space-y-2.5 text-xs">
-              <div className="text-base font-bold text-indigo-700">{selectedAgent.name}</div>
-              <p className="text-slate-700">{selectedAgent.purpose}</p>
+            <div className="space-y-3 text-xs">
+              <div className="font-display text-lg font-bold text-ink-900">{selectedAgent.name}</div>
+              <p className="text-ink-700">{selectedAgent.purpose}</p>
               <div>
-                <span className="font-semibold text-slate-800">Input Context:</span>{" "}
-                <span className="text-slate-600">{selectedAgent.input_context}</span>
+                <span className="font-semibold text-ink-900">Input Context:</span>{" "}
+                <span className="text-ink-700">{selectedAgent.input_context}</span>
               </div>
               <div>
-                <span className="font-semibold text-slate-800">Processing:</span>{" "}
-                <span className="text-slate-600">{selectedAgent.processing}</span>
+                <span className="font-semibold text-ink-900">Processing:</span>{" "}
+                <span className="text-ink-700">{selectedAgent.processing}</span>
               </div>
               <div>
-                <span className="font-semibold text-slate-800">Tools:</span>{" "}
-                <span className="font-mono text-slate-700">{selectedAgent.tools.join(", ")}</span>
+                <span className="font-semibold text-ink-900">Tools:</span>{" "}
+                <span className="font-mono text-ink-700">{selectedAgent.tools.join(", ")}</span>
               </div>
               <div>
-                <span className="font-semibold text-slate-800">Output:</span>{" "}
-                <span className="text-slate-600">{selectedAgent.output}</span>
+                <span className="font-semibold text-ink-900">Output:</span>{" "}
+                <span className="text-ink-700">{selectedAgent.output}</span>
               </div>
               <div>
-                <span className="font-semibold text-slate-800">Mode:</span>{" "}
-                <span className="text-slate-600">{selectedAgent.execution_mode}</span>
+                <span className="font-semibold text-ink-900">Mode:</span>{" "}
+                <span className="font-mono text-ink-700">{selectedAgent.execution_mode}</span>
               </div>
               <div>
-                <span className="font-semibold text-slate-800">Failure &amp; Recovery:</span>{" "}
-                <span className="text-slate-600">{selectedAgent.failure_recovery}</span>
+                <span className="font-semibold text-ink-900">Failure &amp; Recovery:</span>{" "}
+                <span className="text-ink-700">{selectedAgent.failure_recovery}</span>
               </div>
+              {selectedAgent.id === "RiskAgent" && (
+                <div className="p-2.5 rounded-control bg-status-info-bg text-status-info-fg font-semibold">
+                  Risk indicators, not proof of fraud.
+                </div>
+              )}
             </div>
           ) : (
-            <div className="text-xs text-slate-500">Select an agent node to inspect.</div>
+            <div className="text-xs text-ink-500">Select an agent node to inspect.</div>
           )}
-        </div>
+        </Card>
       </div>
 
-      {/* Section 3: Agent Detail Cards */}
-      <div>
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">
-          Configured Pipeline Agents ({agents.length})
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {agents.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => setSelectedAgentId(a.id)}
-              className={`text-left p-4 rounded-xl border transition shadow-sm bg-white ${
-                selectedAgentId === a.id
-                  ? "border-indigo-500 ring-1 ring-indigo-500"
-                  : "border-slate-200 hover:border-slate-300"
-              }`}
-            >
-              <div className="text-xs font-semibold text-indigo-600">Stage {a.order}</div>
-              <div className="text-sm font-bold text-slate-900 mt-0.5">{a.name}</div>
-              <p className="text-xs text-slate-600 mt-1">{a.purpose}</p>
-              <div className="mt-2 text-[11px] font-mono text-slate-500 truncate">
-                {a.tools.join(" • ")}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Section 4: Harness Infrastructure */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">
+      {/* Harness Infrastructure */}
+      <Card>
+        <h2 className="font-display text-lg font-bold text-ink-900 mb-3">
           Harness Infrastructure (Governance Surrounding the 7 Agents)
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {harnessComponents.map((hc) => (
-            <div key={hc.name} className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-              <div className="text-xs font-bold text-slate-900">{hc.name}</div>
-              <div className="text-xs text-slate-600 mt-1">{hc.role}</div>
+            <div key={hc.name} className="p-3.5 rounded-control bg-sand-50 border border-sand-200">
+              <div className="text-xs font-bold text-ink-900">{hc.name}</div>
+              <div className="text-xs text-ink-700 mt-1">{hc.role}</div>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* Section 5: Live Execution Trace Explorer */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-4">
+      {/* Live Execution Trace Explorer */}
+      <Card className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Live Execution Trace Explorer</h2>
-            <p className="text-xs text-slate-500">
-              Persisted investigation runs with stage-by-stage traces and provider provenance.
+            <h2 className="font-display text-lg font-bold text-ink-900">
+              Live Execution Trace Explorer
+            </h2>
+            <p className="text-xs text-ink-500">
+              Persisted investigation runs with stage-by-stage traces and provider provenance. Risk
+              indicators, not proof of fraud.
             </p>
           </div>
           {traces.length > 0 && (
@@ -383,7 +363,7 @@ export const AgentHarnessPage: React.FC = () => {
               aria-label="Select investigation trace"
               value={activeTrace?.investigation_id || ""}
               onChange={(e) => setSelectedTraceId(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
+              className="px-3 py-2 rounded-control border border-sand-200 text-xs bg-sand-50 font-mono"
             >
               {traces.map((t) => (
                 <option key={t.investigation_id} value={t.investigation_id}>
@@ -395,58 +375,54 @@ export const AgentHarnessPage: React.FC = () => {
         </div>
 
         {!activeTrace ? (
-          <div className="p-6 text-center rounded-lg border border-dashed border-slate-300 text-xs text-slate-500">
-            No persisted investigation runs yet. Open an Exception case and click{" "}
-            <strong>Run Investigation</strong> to record a live execution trace.
-          </div>
+          <EmptyState
+            title="No persisted investigation runs yet"
+            description="Open an Exception case and click Run Investigation Agent to record a live execution trace."
+          />
         ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3 text-xs">
-              <StatusBadge value={activeTrace.status} />
-              <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 font-semibold uppercase">
+              <StatusPill value={activeTrace.status} />
+              <span className="px-2.5 py-1 rounded-full bg-sand-100 border border-sand-200 font-mono font-semibold text-ink-900 uppercase">
                 Actual Provider: {activeTrace.actual_provider || activeTrace.model_provider} (
                 {activeTrace.model_name})
               </span>
               {activeTrace.actual_provider === "gemini" && !activeTrace.fallback_used ? (
-                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">
-                  Generated with Google Gemini
-                </span>
+                <StatusPill value="Generated with Google Gemini" tone="success" />
               ) : activeTrace.fallback_used ? (
-                <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">
-                  Mock fallback used — not Gemini-generated.
-                </span>
+                <StatusPill value="Mock fallback used — not Gemini-generated" tone="warning" />
               ) : null}
-              <span className="text-slate-600">
+              <span className="font-mono text-ink-700">
                 Confidence: {(activeTrace.confidence * 100).toFixed(0)}%
               </span>
-              <span className="text-slate-600">
+              <span className="font-mono text-ink-700">
                 Human Approval Required: {String(activeTrace.human_approval_required)}
               </span>
             </div>
 
-            <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800">
+            <div className="p-3.5 rounded-control bg-sand-50 border border-sand-200 text-xs text-ink-900">
               {activeTrace.summary}
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+            <div className="overflow-x-auto rounded-card border border-sand-200">
+              <table className="w-full text-xs text-left font-mono">
+                <thead className="bg-sand-100 text-ink-500 border-b border-sand-200">
                   <tr>
-                    <th className="py-2 px-3">Stage Agent</th>
-                    <th className="py-2 px-3">Status</th>
-                    <th className="py-2 px-3">Duration</th>
-                    <th className="py-2 px-3">Summary</th>
+                    <th scope="col" className="py-2.5 px-3">Stage Agent</th>
+                    <th scope="col" className="py-2.5 px-3">Status</th>
+                    <th scope="col" className="py-2.5 px-3">Duration</th>
+                    <th scope="col" className="py-2.5 px-3">Summary</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-sand-200">
                   {(activeTrace.execution_trace || []).map((st: any, i: number) => (
                     <tr key={`${st.agent}-${i}`}>
-                      <td className="py-2 px-3 font-semibold text-slate-900">{st.agent}</td>
-                      <td className="py-2 px-3">
-                        <StatusBadge value={st.status} />
+                      <td className="py-2.5 px-3 font-semibold text-ink-900">{st.agent}</td>
+                      <td className="py-2.5 px-3">
+                        <StatusPill value={st.status} />
                       </td>
-                      <td className="py-2 px-3 font-mono text-slate-600">{st.duration_ms} ms</td>
-                      <td className="py-2 px-3 text-slate-700">{st.summary}</td>
+                      <td className="py-2.5 px-3 text-ink-700">{st.duration_ms} ms</td>
+                      <td className="py-2.5 px-3 text-ink-700 font-sans">{st.summary}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -454,29 +430,29 @@ export const AgentHarnessPage: React.FC = () => {
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* Section 6: Safety & Trust Boundaries */}
-      <div className="bg-slate-900 text-slate-100 rounded-xl p-5 shadow-sm">
-        <div className="flex items-center gap-2 text-amber-400 text-sm font-bold mb-2">
+      {/* Safety & Trust Boundaries Footer */}
+      <div className="bg-ink-900 text-on-ink rounded-hero p-6 shadow-soft space-y-3">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em]">
           <ShieldAlert className="w-4 h-4" />
-          <span>AI RECOMMENDATION ≠ FINANCIAL AUTHORIZATION</span>
+          <span>AI RECOMMENDATION ≠ FINANCIAL AUTHORIZATION • AI never approves, matches, or pays</span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-slate-300">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs opacity-90">
           <div className="flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
             <span>All financial totals, taxes, and tolerances run in pure decimal.Decimal.</span>
           </div>
           <div className="flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
             <span>Document text is fenced as untrusted evidence; zero SQL or pay tools.</span>
           </div>
           <div className="flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
             <span>Evidence references are post-validated against org-scoped DB rows.</span>
           </div>
           <div className="flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
             <span>RBAC, maker-checker, and append-only audit triggers enforce governance.</span>
           </div>
         </div>
