@@ -131,14 +131,28 @@ export const api = {
     request<{ nodes: any[]; edges: any[]; source: string }>(`/graph/transactions/${id}/rebuild`, {
       method: "POST",
     }),
-  getObligationGraph: (id: string) =>
+  getObligationGraph: (id: string, view = "overview") =>
     request<{
       nodes: any[];
       edges: any[];
       summary: Record<string, string>;
       has_payment_records: boolean;
+      view?: string;
+      degraded?: boolean;
       source: string;
-    }>(`/graph/obligations/${id}`),
+    }>(`/graph/obligations/${id}?view=${encodeURIComponent(view)}`),
+  getGraphHealth: () => request<any>("/graph/health"),
+  backfillGraph: () => request<any>("/graph/sync/backfill", { method: "POST" }),
+  getRelationshipPath: (sourceGraphKey: string, targetGraphKey: string) =>
+    request<any>(
+      `/graph/obligations/path?source_graph_key=${encodeURIComponent(
+        sourceGraphKey
+      )}&target_graph_key=${encodeURIComponent(targetGraphKey)}`
+    ),
+  getGraphRiskDiscovery: () => request<any>("/graph/risk-discovery"),
+  getAgentGraphExecution: (investigationId: string) =>
+    request<any>(`/graph/agents/investigations/${investigationId}`),
+  getAgentGraphAnalytics: () => request<any>("/graph/agents/analytics"),
   getAgentHarnessOverview: () => request<any>("/intelligence/agent-harness"),
   testGeminiConnection: () =>
     request<{
