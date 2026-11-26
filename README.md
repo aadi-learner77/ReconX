@@ -4,8 +4,8 @@
 
 ReconX AI reconciles **Purchase Orders (PO)**, **Goods Receipt Notes (GRN)**, and **Supplier Invoices** using a pure deterministic `decimal.Decimal` matching engine, guarded document ingestion (`PyMuPDF` + `RapidOCR` + `openpyxl`), rule- and ML-based risk indicators, bounded AI investigations with DB-verified evidence citations, and strict RBAC + maker-checker approval workflows.
 
-- **100% Free-Tier Stack**: FastAPI + PostgreSQL/SQLite + React/TypeScript + Vite + Tailwind. Runs offline by default (`LLM_PROVIDER=mock`).
-- **Deterministic Finance**: Zero `float` usage inside `backend/app/services/reconciliation/`. Every amount, tax calculation, tolerance, and quantity rollup uses `decimal.Decimal` (`ROUND_HALF_UP`).
+- **100% Free-Tier Stack**: FastAPI + PostgreSQL 16 + Neo4j 5.26 Community + React/TypeScript + Vite + Tailwind (Sandstone Ledger theme with self-hosted `@fontsource` typography and Radix UI primitives). Runs offline by default (`LLM_PROVIDER=mock`).
+- **Deterministic Finance**: Zero `float` usage inside `backend/app/services/reconciliation/`. Every amount, tax calculation, tolerance, and quantity rollup uses `decimal.Decimal` (`ROUND_HALF_UP`). PostgreSQL remains the authoritative financial source of truth; Neo4j serves as the graph intelligence layer via a transactional outbox (`graph_outbox_event`).
 - **Human Control**: AI never approves, matches, or pays. Risk outputs are surfaced strictly as *risk indicators, not proof of fraud*.
 
 ---
@@ -30,7 +30,8 @@ flowchart LR
 
     API --> AUTH & DOC & RECON & POL & BRIEF & RISK & AGENT & AUDIT
     AGENT -->|"<<<UNTRUSTED_DOCUMENT_CONTENT>>>"| LLM["LLMProvider (mock / gemini-2.5-flash / groq / ollama) + LLMTelemetry"]
-    Core --> DB[("PostgreSQL 16 / SQLite (NUMERIC(18,4) + Append-Only Audit)")]
+    Core --> DB[("PostgreSQL 16 (NUMERIC(18,4) + Append-Only Audit + Graph Outbox)")]
+    DB -->|"Transactional Outbox Worker"| NEO[("Neo4j 5.26 Community (Obligation & Agent Execution Graph)")]
 ```
 
 ### 7-Stage Agent Harness (`FinanceOrchestrator`)
@@ -40,7 +41,8 @@ flowchart LR
     O["FinanceOrchestrator"] --> D["1. DocumentAgent"] --> M["2. MatchingAgent"] --> R["3. RiskAgent"] --> V["4. VendorIntelligenceAgent"] --> G["5. EvidenceGraphAgent"] --> I["6. InvestigationAgent (Gemini / Fallback)"] --> A["7. AuditAgent + Human Approval Gate"]
 ```
 
-- [System Architecture](docs/architecture.md) & [Agent Architecture](docs/agent-architecture.md)
+- [System Architecture](docs/architecture.md), [Agent Architecture](docs/agent-architecture.md) & [Neo4j Graph Architecture](docs/neo4j-architecture.md)
+- [Neo4j Data Model](docs/neo4j-data-model.md), [Neo4j Setup](docs/neo4j-setup.md) & [Neo4j Demo Script](docs/neo4j-demo-script.md)
 - [Software Requirements Specification](docs/SRS.md), [Decisions Log](docs/DECISIONS.md) & [Traceability Matrix](docs/requirements-traceability.md)
 - [Dynamic Policy Engine](docs/policy-engine.md) & [Executive Boardroom Brief](docs/executive-brief.md)
 - [API Reference](docs/api.md) & [API Contracts](docs/api-contracts.md)
@@ -52,8 +54,9 @@ flowchart LR
 
 ## Screenshots
 
-### Finance Operations Dashboard & Gemini Status
+### Finance Operations Dashboard — Bento Grid (Light & Dark)
 ![Finance Operations Dashboard](docs/screenshots/audit-dashboard.png)
+![Finance Operations Dashboard (Dark Mode)](docs/screenshots/audit-dashboard-dark.png)
 
 ### Three-Way Match Detail & Financial Evidence Graph
 ![Three-Way Match Detail](docs/screenshots/audit-transaction-detail.png)
@@ -81,7 +84,8 @@ cp .env.example .env
 docker compose up --build
 ```
 - Backend runs `alembic upgrade head` automatically on startup at `http://localhost:8000` (Swagger docs: `http://localhost:8000/docs`).
-- Frontend serves at `http://localhost:5173`.
+- Frontend serves at `http://localhost:5173` (UI Kit showcase: `http://localhost:5173/dev/ui-kit`).
+- Neo4j Browser serves at `http://localhost:7474` (Bolt: `bolt://localhost:7687`).
 - To seed the demo dataset inside Docker:
   ```bash
   docker compose exec backend python scripts/seed.py --reset
