@@ -1,7 +1,8 @@
-/* Sandstone Ledger — Design Tokens (Light & Dark)
+/* Sandstone Ledger — Design Tokens (Light & Dark via [data-theme] + .dark)
    Zero hard-coded hex values outside this file. */
 
-:root {
+:root,
+[data-theme="light"] {
   /* Core Palette (Light Default) */
   --sand-50: #F6F0E8;
   --sand-100: #EDE3D7;
@@ -15,7 +16,7 @@
 
   --paper: #FBF8F4;
 
-  /* Semantic Surfaces & Foreground (WCAG AA verified >= 4.5:1) */
+  /* Semantic Surfaces & Foreground (WCAG AA >= 4.5:1) */
   --canvas-bg: var(--sand-50);
   --surface-card: var(--paper);
   --surface-subtle: var(--sand-100);
@@ -40,8 +41,34 @@
   --status-neutral-fg: #57534E;
   --status-neutral-bg: #E1D2C2;
 
-  /* Elevation & Motion */
-  --shadow-soft: 0 1px 0 rgba(42, 41, 39, 0.04), 0 8px 24px rgba(42, 41, 39, 0.06);
+  /* Radii Scale (6 / 10 / 16 / 24) */
+  --radius-sm: 6px;
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-hero: 24px;
+
+  /* Spacing Scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* 3 Elevation Levels: hairline, card, floating */
+  --shadow-hairline: 0 1px 0 rgba(42, 41, 39, 0.06);
+  --shadow-card: 0 1px 0 rgba(42, 41, 39, 0.04), 0 8px 24px rgba(42, 41, 39, 0.06);
+  --shadow-floating: 0 4px 12px rgba(42, 41, 39, 0.08), 0 16px 40px rgba(42, 41, 39, 0.12);
+  --shadow-soft: var(--shadow-card);
+
+  /* Motion Tokens */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 360ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
   --focus-ring: #2A2927;
   --focus-offset: #F6F0E8;
 
@@ -55,7 +82,8 @@
   );
 }
 
-.dark {
+.dark,
+[data-theme="dark"] {
   --sand-50: #1F1E1C;
   --sand-100: #262522;
   --sand-200: #3B3835;
@@ -92,7 +120,11 @@
   --status-neutral-fg: #C9BEB2;
   --status-neutral-bg: #3B3835;
 
-  --shadow-soft: 0 1px 0 rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-hairline: 0 1px 0 rgba(0, 0, 0, 0.25);
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-floating: 0 8px 20px rgba(0, 0, 0, 0.35), 0 20px 48px rgba(0, 0, 0, 0.5);
+  --shadow-soft: var(--shadow-card);
+
   --focus-ring: #D3BFAE;
   --focus-offset: #1F1E1C;
 
@@ -116,10 +148,22 @@
     background-color: var(--canvas-bg);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  /* Subtle paper-like SVG noise/grain overlay (opacity 0.03) */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
 
   h1, h2, h3, .font-display {
-    font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
     letter-spacing: -0.02em;
   }
 
@@ -131,6 +175,29 @@
   *:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--sand-300);
+    color: var(--ink-900);
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--surface-subtle);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--sand-400);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-500);
   }
 }
 
@@ -146,7 +213,27 @@
 }
 
 .animate-sandstone-enter {
-  animation: sandstoneEnter 180ms ease-out both;
+  animation: sandstoneEnter var(--motion-base) var(--ease-standard) both;
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    var(--surface-subtle) 25%,
+    var(--surface-card) 50%,
+    var(--surface-subtle) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s infinite linear;
 }
 
 @media (prefers-reduced-motion: reduce) {

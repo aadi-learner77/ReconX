@@ -1,6 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, ArrowRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Command as Cmdk } from "cmdk";
+import { ArrowRight, FileText, Search } from "lucide-react";
+import { api } from "../../api/client";
 import { Modal } from "./Overlay";
 
 export interface CommandItem {
@@ -9,19 +12,19 @@ export interface CommandItem {
   section: string;
 }
 
-const DEFAULT_COMMANDS: CommandItem[] = [
-  { label: "Dashboard Overview", to: "/", section: "Core" },
-  { label: "Document Workspace", to: "/documents", section: "Core" },
-  { label: "Transactions Ledger", to: "/transactions", section: "Core" },
-  { label: "Exceptions Queue", to: "/exceptions", section: "Core" },
-  { label: "Vendor Intelligence", to: "/vendors", section: "Core" },
-  { label: "Cash Obligations", to: "/cash", section: "Core" },
-  { label: "Agent Harness Explorer", to: "/agent-harness", section: "Intelligence" },
-  { label: "Financial Obligation Graph", to: "/obligation-graph", section: "Intelligence" },
+const PAGE_COMMANDS: CommandItem[] = [
+  { label: "Dashboard", to: "/", section: "Operations" },
+  { label: "Reconciliations (Transactions)", to: "/transactions", section: "Operations" },
+  { label: "Documents", to: "/documents", section: "Operations" },
+  { label: "Exceptions", to: "/exceptions", section: "Operations" },
+  { label: "Vendors", to: "/vendors", section: "Operations" },
+  { label: "Cash Obligations", to: "/cash", section: "Operations" },
+  { label: "Agent Harness", to: "/agent-harness", section: "Intelligence" },
+  { label: "Obligation Graph", to: "/obligation-graph", section: "Intelligence" },
   { label: "Policy Studio", to: "/policy-studio", section: "Intelligence" },
-  { label: "Executive Boardroom Brief", to: "/executive-brief", section: "Intelligence" },
-  { label: "Audit Explorer", to: "/audit", section: "Governance" },
-  { label: "Admin Settings", to: "/admin", section: "Governance" },
+  { label: "Executive Brief", to: "/executive-brief", section: "Intelligence" },
+  { label: "Audit Trail", to: "/audit", section: "Governance" },
+  { label: "Settings", to: "/admin", section: "Governance" },
 ];
 
 export const CommandPalette: React.FC<{
@@ -35,55 +38,87 @@ export const CommandPalette: React.FC<{
     if (!open) setQuery("");
   }, [open]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return DEFAULT_COMMANDS;
-    return DEFAULT_COMMANDS.filter(
-      (c) => c.label.toLowerCase().includes(q) || c.section.toLowerCase().includes(q)
-    );
-  }, [query]);
+  const { data: txData } = useQuery({
+    queryKey: ["cmdk-tx", query],
+    queryFn: () => api.listTransactions({ search: query, page_size: "6" }),
+    enabled: open,
+  });
+
+  const go = (to: string) => {
+    navigate(to);
+    onClose();
+  };
 
   return (
-    <Modal open={open} onClose={onClose} title="Quick Navigation" maxWidthClass="max-w-md">
-      <div className="space-y-3">
+    <Modal open={open} onClose={onClose} title="Quick Navigation (⌘K)" maxWidthClass="max-w-lg">
+      <Cmdk label="Global Command Menu" className="space-y-3">
         <div className="relative">
-          <Search className="w-4 h-4 text-ink-500 absolute left-3 top-2.5" />
-          <input
+          <Search className="w-4 h-4 text-ink-500 absolute left-3 top-2.5" strokeWidth={1.5} />
+          <Cmdk.Input
             autoFocus
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Jump to page or module..."
-            aria-label="Search pages"
+            onValueChange={setQuery}
+            placeholder="Jump to pages, POs (PO-2026-0002), or vendors..."
+            aria-label="Search pages, POs, or invoices"
             className="w-full rounded-control border border-sand-200 bg-sand-50 pl-9 pr-3 py-2 text-sm text-ink-900 focus:border-ink-900 focus:outline-none"
           />
         </div>
-        <ul className="max-h-64 overflow-y-auto divide-y divide-sand-200 rounded-card border border-sand-200">
-          {filtered.length === 0 ? (
-            <li className="p-4 text-xs text-ink-500 text-center">No matching destinations.</li>
-          ) : (
-            filtered.map((item) => (
-              <li key={item.to}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigate(item.to);
-                    onClose();
-                  }}
-                  className="w-full px-3.5 py-2.5 text-left flex items-center justify-between text-sm hover:bg-sand-100 transition-colors"
+
+        <Cmdk.List className="max-h-72 overflow-y-auto rounded-card border border-sand-200 divide-y divide-sand-200">
+          <Cmdk.Empty className="p-4 text-xs text-ink-500 text-center">
+            No matching pages, POs, or invoices.
+          </Cmdk.Empty>
+
+          <Cmdk.Group
+            heading="Pages"
+            className="[&_[cmdk-group-heading]]:px-3.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.08em] [&_[cmdk-group-heading]]:text-ink-500 [&_[cmdk-group-heading]]:bg-sand-100"
+          >
+            {PAGE_COMMANDS.map((item) => (
+              <Cmdk.Item
+                key={item.to}
+                value={`${item.label} ${item.section}`}
+                onSelect={() => go(item.to)}
+                className="px-3.5 py-2.5 flex items-center justify-between text-sm cursor-pointer aria-selected:bg-sand-100 hover:bg-sand-100"
+              >
+                <div>
+                  <div className="font-medium text-ink-900">{item.label}</div>
+                  <div className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
+                    {item.section}
+                  </div>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5 text-ink-500" strokeWidth={1.5} />
+              </Cmdk.Item>
+            ))}
+          </Cmdk.Group>
+
+          {(txData?.items || []).length > 0 && (
+            <Cmdk.Group
+              heading="Purchase Orders & Transactions"
+              className="[&_[cmdk-group-heading]]:px-3.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.08em] [&_[cmdk-group-heading]]:text-ink-500 [&_[cmdk-group-heading]]:bg-sand-100"
+            >
+              {(txData?.items || []).map((tx) => (
+                <Cmdk.Item
+                  key={tx.transaction_id}
+                  value={`${tx.po_number || ""} ${tx.vendor_name} ${tx.transaction_id}`}
+                  onSelect={() => go(`/transactions/${tx.transaction_id}`)}
+                  className="px-3.5 py-2.5 flex items-center justify-between text-sm cursor-pointer aria-selected:bg-sand-100 hover:bg-sand-100"
                 >
-                  <div>
-                    <div className="font-medium text-ink-900">{item.label}</div>
-                    <div className="text-[11px] uppercase tracking-[0.08em] text-ink-500">
-                      {item.section}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <FileText className="w-3.5 h-3.5 text-ink-500 shrink-0" strokeWidth={1.5} />
+                    <div className="min-w-0">
+                      <div className="font-mono font-semibold text-ink-900 text-xs">
+                        {tx.po_number || tx.transaction_id.slice(0, 8)}
+                      </div>
+                      <div className="text-xs text-ink-500 truncate">{tx.vendor_name}</div>
                     </div>
                   </div>
-                  <ArrowRight className="w-3.5 h-3.5 text-ink-500" />
-                </button>
-              </li>
-            ))
+                  <span className="font-mono text-[11px] text-ink-700">{tx.latest_outcome || tx.status}</span>
+                </Cmdk.Item>
+              ))}
+            </Cmdk.Group>
           )}
-        </ul>
-      </div>
+        </Cmdk.List>
+      </Cmdk>
     </Modal>
   );
 };

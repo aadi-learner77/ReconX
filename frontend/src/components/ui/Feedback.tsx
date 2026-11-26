@@ -4,7 +4,7 @@ import { cn } from "../../utils/cn";
 export const Skeleton: React.FC<{ className?: string }> = ({ className }) => (
   <div
     aria-hidden="true"
-    className={cn("animate-pulse rounded-card bg-sand-100", className)}
+    className={cn("animate-shimmer rounded-card bg-sand-100 border border-sand-200/60", className)}
   />
 );
 
@@ -26,7 +26,7 @@ export const EmptyState: React.FC<{
   description: string;
   action?: React.ReactNode;
 }> = ({ title, description, action }) => (
-  <div className="rounded-card border border-sand-200 bg-paper p-10 text-center space-y-3">
+  <div className="rounded-card border border-sand-200 bg-paper p-10 text-center space-y-3 shadow-hairline">
     <svg
       viewBox="0 0 80 56"
       fill="none"

@@ -1,0 +1,55 @@
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 18mm 16mm 20mm 16mm;
+
+    @bottom-left {
+      content: "Prepared by ReconX AI · AI never approves or pays";
+      font-family: "Inter", sans-serif;
+      font-size: 8.5pt;
+      color: #6e6a64;
+    }
+
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 8.5pt;
+      color: #6e6a64;
+    }
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #1f1e1c !important;
+  }
+
+  body::before {
+    display: none !important;
+  }
+
+  aside,
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .board-paper {
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .board-section {
+    break-inside: avoid;
+  }
+}

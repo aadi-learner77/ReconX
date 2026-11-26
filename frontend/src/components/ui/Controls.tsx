@@ -1,10 +1,42 @@
 import React from "react";
+import * as TabsPrimitive from "@radix-ui/react-tabs";
 import { cn } from "../../utils/cn";
 
 export interface TabOption {
   id: string;
   label: string;
 }
+
+export const RadixTabs = TabsPrimitive.Root;
+
+export const RadixTabsList = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.List
+    ref={ref}
+    className={cn("inline-flex border-b border-sand-200 gap-6", className)}
+    {...props}
+  />
+));
+RadixTabsList.displayName = "RadixTabsList";
+
+export const RadixTabsTrigger = React.forwardRef<
+  React.ElementRef<typeof TabsPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "pb-2.5 text-sm font-medium border-b-2 -mb-px transition-colors text-ink-500 border-transparent hover:text-ink-900 data-[state=active]:border-ink-900 data-[state=active]:text-ink-900",
+      className
+    )}
+    {...props}
+  />
+));
+RadixTabsTrigger.displayName = "RadixTabsTrigger";
+
+export const RadixTabsContent = TabsPrimitive.Content;
 
 export const Tabs: React.FC<{
   options: TabOption[];
@@ -59,7 +91,7 @@ export const SegmentedControl: React.FC<{
           className={cn(
             "px-3 py-1.5 rounded-[7px] text-xs font-semibold transition-all",
             active
-              ? "bg-ink-900 text-on-ink shadow-soft"
+              ? "bg-ink-900 text-on-ink shadow-hairline"
               : "text-ink-700 hover:text-ink-900"
           )}
         >

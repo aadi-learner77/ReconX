@@ -13,10 +13,10 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   const base =
     variant === "hero"
-      ? "rounded-hero bg-sand-300 border border-sand-200 p-6 md:p-8 shadow-soft"
+      ? "rounded-hero bg-sand-300 border border-sand-200 p-6 md:p-8 shadow-card"
       : variant === "subtle"
-        ? "rounded-card bg-sand-100 border border-sand-200 p-5"
-        : "rounded-card bg-paper border border-sand-200 p-5 shadow-soft";
+        ? "rounded-card bg-sand-100 border border-sand-200 p-5 shadow-hairline"
+        : "rounded-card bg-paper border border-sand-200 p-5 shadow-card";
 
   return (
     <div className={cn(base, "animate-sandstone-enter", className)} {...props}>
@@ -54,7 +54,7 @@ export const Stat: React.FC<StatProps> = ({
   return (
     <div
       className={cn(
-        "rounded-card bg-paper border border-sand-200 p-5 shadow-soft",
+        "rounded-card bg-paper border border-sand-200 p-5 shadow-card",
         className
       )}
     >

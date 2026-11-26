@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: "class",
+  darkMode: ["class", '[data-theme="dark"]'],
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
@@ -34,17 +34,30 @@ export default {
         },
       },
       fontFamily: {
-        display: ['"Outfit"', "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ['"Manrope"', "ui-sans-serif", "system-ui", "sans-serif"],
+        serif: ['"Fraunces"', "Georgia", "serif"],
         sans: ['"Inter"', "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ['"JetBrains Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
       },
       borderRadius: {
-        hero: "24px",
-        card: "16px",
-        control: "10px",
+        sm: "var(--radius-sm)",
+        control: "var(--radius-control)",
+        card: "var(--radius-card)",
+        hero: "var(--radius-hero)",
       },
       boxShadow: {
+        hairline: "var(--shadow-hairline)",
+        card: "var(--shadow-card)",
+        floating: "var(--shadow-floating)",
         soft: "var(--shadow-soft)",
+      },
+      transitionDuration: {
+        fast: "var(--motion-fast)",
+        base: "var(--motion-base)",
+        slow: "var(--motion-slow)",
+      },
+      transitionTimingFunction: {
+        standard: "var(--ease-standard)",
       },
     },
   },

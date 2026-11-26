@@ -1,9 +1,10 @@
 import React, { Suspense, lazy } from "react";
+import { MotionConfig } from "framer-motion";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { ThemeProvider } from "./theme/ThemeContext";
 import { Layout } from "./components/Layout";
-import { PageSkeleton } from "./components/ui";
+import { PageSkeleton, Toaster } from "./components/ui";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DocumentsPage } from "./pages/DocumentsPage";
@@ -17,6 +18,7 @@ import { ExecutiveBriefPage } from "./pages/ExecutiveBriefPage";
 import { AuditPage } from "./pages/AuditPage";
 import { AdminPage } from "./pages/AdminPage";
 import { StyleguidePage } from "./pages/StyleguidePage";
+import { UiKitPage } from "./pages/UiKitPage";
 
 // Lazy-load heavy React Flow pages for bundle performance
 const TransactionDetailPage = lazy(() =>
@@ -44,8 +46,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 export const App: React.FC = () => {
   return (
-    <ThemeProvider>
-      <AuthProvider>
+    <MotionConfig reducedMotion="user">
+      <ThemeProvider>
+        <AuthProvider>
+        <Toaster />
         <Suspense
           fallback={
             <div className="p-8 max-w-6xl mx-auto">
@@ -56,6 +60,7 @@ export const App: React.FC = () => {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/styleguide" element={<StyleguidePage />} />
+            <Route path="/dev/ui-kit" element={<UiKitPage />} />
             <Route
               path="/"
               element={
@@ -84,6 +89,7 @@ export const App: React.FC = () => {
         </Suspense>
       </AuthProvider>
     </ThemeProvider>
+    </MotionConfig>
   );
 };
 

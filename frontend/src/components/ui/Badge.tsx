@@ -1,29 +1,22 @@
 import React from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Info,
-  XCircle,
-} from "lucide-react";
 import { cn } from "../../utils/cn";
 
 export type StatusTone = "success" | "warning" | "danger" | "info" | "neutral";
 
 const TONE_CLASSES: Record<StatusTone, string> = {
-  success: "bg-status-success-bg text-status-success-fg",
-  warning: "bg-status-warning-bg text-status-warning-fg",
-  danger: "bg-status-danger-bg text-status-danger-fg",
-  info: "bg-status-info-bg text-status-info-fg",
-  neutral: "bg-status-neutral-bg text-status-neutral-fg",
+  success: "bg-status-success-bg text-status-success-fg border-status-success-fg/25",
+  warning: "bg-status-warning-bg text-status-warning-fg border-status-warning-fg/25",
+  danger: "bg-status-danger-bg text-status-danger-fg border-status-danger-fg/25",
+  info: "bg-status-info-bg text-status-info-fg border-status-info-fg/25",
+  neutral: "bg-status-neutral-bg text-status-neutral-fg border-sand-400/30",
 };
 
-const TONE_ICONS: Record<StatusTone, React.ComponentType<{ className?: string }>> = {
-  success: CheckCircle2,
-  warning: AlertTriangle,
-  danger: XCircle,
-  info: Info,
-  neutral: Clock,
+const DOT_CLASSES: Record<StatusTone, string> = {
+  success: "bg-status-success-fg",
+  warning: "bg-status-warning-fg",
+  danger: "bg-status-danger-fg",
+  info: "bg-status-info-fg",
+  neutral: "bg-status-neutral-fg",
 };
 
 export function inferStatusTone(value: string): StatusTone {
@@ -45,7 +38,9 @@ export function inferStatusTone(value: string): StatusTone {
   }
   if (
     [
+      "VARIANCE",
       "PASS_WITH_TOLERANCE",
+      "NEEDS_REVIEW",
       "REVIEW_REQUIRED",
       "INCOMPLETE",
       "MEDIUM",
@@ -73,17 +68,19 @@ export interface StatusPillProps {
 
 export const StatusPill: React.FC<StatusPillProps> = ({ value, tone, className }) => {
   const resolved = tone || inferStatusTone(value);
-  const Icon = TONE_ICONS[resolved];
   return (
     <span
       data-testid="status-badge"
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide whitespace-nowrap",
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[11px] font-semibold tracking-wide whitespace-nowrap",
         TONE_CLASSES[resolved],
         className
       )}
     >
-      <Icon className="w-3 h-3 shrink-0" aria-hidden="true" />
+      <span
+        className={cn("w-1.5 h-1.5 rounded-full shrink-0", DOT_CLASSES[resolved])}
+        aria-hidden="true"
+      />
       <span>{value}</span>
     </span>
   );

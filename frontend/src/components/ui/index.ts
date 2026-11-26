@@ -8,3 +8,4 @@ export * from "./Controls";
 export * from "./Feedback";
 export * from "./ThemeToggle";
 export * from "./CommandPalette";
+export * from "./DomainPrimitives";
