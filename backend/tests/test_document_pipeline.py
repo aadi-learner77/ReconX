@@ -243,3 +243,57 @@ def test_xlsx_grn_and_injection_invoice_and_job_failure_retry(
     retry_resp = client.post(f"/api/v1/admin/jobs/{broken_job.id}/retry", headers=admin_headers)
     assert retry_resp.status_code == 200
     assert retry_resp.json()["status"] == "QUEUED"
+
+
+def test_delete_document_cleans_up_consequences(
+    client: TestClient,
+    test_db_session: Session,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    storage_dir = tmp_path / "storage"
+    monkeypatch.setenv("STORAGE_ROOT", str(storage_dir))
+    get_settings.cache_clear()
+
+    seed_synthetic_dataset(test_db_session, reset=True)
+    sample_files = {p.name: p for p in make_all_sample_docs(tmp_path / "samples")}
+    headers = _login_headers(client, "operator@reconx-demo.com")
+
+    po1 = client.get("/api/v1/transactions?scenario_label=AT-01", headers=headers).json()["items"][0]
+    po1_id = po1["transaction_id"]
+    assert client.post(f"/api/v1/transactions/{po1_id}/reconcile", headers=headers).json()["outcome"] == "MATCHED"
+
+    # Upload an extra invoice linked to PO-2026-0001
+    up = client.post(
+        "/api/v1/documents",
+        headers=headers,
+        files={"file": ("sample_invoice_at01.pdf", sample_files["sample_invoice_at01.pdf"].read_bytes(), "application/pdf")},
+    )
+    assert up.status_code == 202
+    doc_id = up.json()["document_id"]
+    job_row = test_db_session.get(Job, __import__("uuid").UUID(up.json()["job_id"]))
+    assert job_row is not None
+    process_document_job(test_db_session, job_row, storage=StorageAdapter(storage_dir))
+
+    # Patch document number so it creates a second invoice on PO-2026-0001 and verify
+    client.patch(
+        f"/api/v1/documents/{doc_id}/fields",
+        headers=headers,
+        json={"corrections": [{"field_name": "document_number", "value": "INV-EXTRA-999"}]},
+    )
+    client.post(f"/api/v1/documents/{doc_id}/link", headers=headers, json={"po_id": po1_id})
+    ver = client.post(f"/api/v1/documents/{doc_id}/verify", headers=headers)
+    assert ver.status_code == 200
+    assert client.post(f"/api/v1/transactions/{po1_id}/reconcile", headers=headers).json()["outcome"] == "EXCEPTION"
+
+    # Delete the document -> removes extra invoice & re-reconciles PO-2026-0001 back to MATCHED
+    del_resp = client.delete(f"/api/v1/documents/{doc_id}", headers=headers)
+    assert del_resp.status_code == 200
+    ddata = del_resp.json()
+    assert ddata["deleted"] is True
+    assert po1_id in ddata["reconciled_po_ids"]
+
+    assert client.get(f"/api/v1/documents/{doc_id}", headers=headers).status_code == 404
+    po1_after = client.get(f"/api/v1/transactions/{po1_id}", headers=headers).json()
+    assert po1_after["latest_reconciliation"]["outcome"] == "MATCHED"
+    assert len(po1_after["invoices"]) == 1

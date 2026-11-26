@@ -175,8 +175,12 @@ def test_upgraded_copilot_structured_tools_and_guardrails(
 
 
 def test_agent_harness_and_obligation_graph_endpoints(
-    client: TestClient, test_db_session: Session
+    client: TestClient, test_db_session: Session, monkeypatch
 ) -> None:
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    get_settings.cache_clear()
     seed_synthetic_dataset(test_db_session, reset=True)
     headers = _login_headers(client, "operator@reconx-demo.com")
 

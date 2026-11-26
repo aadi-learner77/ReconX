@@ -211,7 +211,10 @@ def test_architecture_boundaries_and_no_secrets_scan() -> None:
 
     repo_root = backend_root.parent
     forbidden_prefixes = ("AIzaSy", "gsk_", "AKIA", "sk-proj-", "ghp_")
-    for target in [repo_root / ".env.example", *list((backend_root / "app").rglob("*.py"))]:
+    targets = list((backend_root / "app").rglob("*.py"))
+    if (repo_root / ".env.example").exists():
+        targets.insert(0, repo_root / ".env.example")
+    for target in targets:
         text = target.read_text(encoding="utf-8")
         for pref in forbidden_prefixes:
             assert pref not in text, f"Suspicious secret prefix {pref} found in {target}"
