@@ -295,7 +295,21 @@ def run_case_investigation(
         model_name=actual_model,
         confidence=structured.confidence,
     )
+    from app.services.neo4j.outbox_worker import process_pending_outbox_events
+    from app.services.neo4j.sync_service import enqueue_graph_event
+
+    enqueue_graph_event(
+        db,
+        organization_id=current_user.organization_id,
+        event_type="INVESTIGATION_COMPLETED",
+        entity_type="investigation",
+        entity_id=str(inv_row.id),
+        payload={"transaction_id": str(case.transaction_id), "case_id": str(case.id)},
+    )
     db.commit()
+    process_pending_outbox_events(
+        db, organization_id=current_user.organization_id, batch_size=10
+    )
 
     return {
         "investigation_id": str(inv_row.id),

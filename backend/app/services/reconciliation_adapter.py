@@ -421,7 +421,19 @@ def execute_reconciliation(
             "disputed_amount": str(output.disputed_amount),
         },
     )
+    from app.services.neo4j.outbox_worker import process_pending_outbox_events
+    from app.services.neo4j.sync_service import enqueue_graph_event
+
+    enqueue_graph_event(
+        db,
+        organization_id=organization_id,
+        event_type="RECONCILIATION_COMPLETED",
+        entity_type="transaction",
+        entity_id=str(transaction_id),
+        payload={"transaction_id": str(transaction_id), "run_id": str(run.id)},
+    )
     db.commit()
+    process_pending_outbox_events(db, organization_id=organization_id, batch_size=10)
 
     return {
         "run_id": str(run.id),

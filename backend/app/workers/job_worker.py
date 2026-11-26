@@ -240,6 +240,11 @@ class BackgroundJobWorker:
                     if next_job is not None:
                         process_document_job(db, next_job)
                         processed_any = True
+                    from app.services.neo4j.outbox_worker import process_pending_outbox_events
+
+                    outbox_res = process_pending_outbox_events(db)
+                    if outbox_res.get("processed", 0) > 0:
+                        processed_any = True
             except Exception as exc:
                 logger.error("worker_loop_error", extra={"extra_fields": {"error": str(exc)}})
             if not processed_any:

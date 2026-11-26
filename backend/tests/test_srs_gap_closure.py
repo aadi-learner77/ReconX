@@ -220,7 +220,7 @@ def test_agent_harness_and_obligation_graph_endpoints(
     assert Decimal(odata["summary"]["accepted_qty"]) == Decimal("90")
     assert Decimal(odata["summary"]["unsupported_invoiced_qty"]) == Decimal("10")
     edge_labels = {e["label"] for e in odata["edges"]}
-    assert "RECEIVES_ORDER" in edge_labels
-    assert "CREATES" in edge_labels
-    assert "FULFILLS" in edge_labels
+    assert "ISSUED" in edge_labels
+    assert "CONTAINS" in edge_labels
+    assert "HAS_RECEIPT" in edge_labels
     assert "BILLS_AGAINST" in edge_labels

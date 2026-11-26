@@ -817,6 +817,9 @@ def seed_synthetic_dataset(
                 actor_type="SYSTEM",
                 actor_id="seed_baseline",
             )
+        from app.services.neo4j.backfill import backfill_organization_graph
+
+        backfill_organization_graph(db, organization_id=org.id)
     inv_rows = list(
         db.scalars(
             select(Invoice)

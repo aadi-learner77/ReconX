@@ -39,6 +39,22 @@ from app.services.graph.builder import (
     build_transaction_obligation_graph,
     rebuild_transaction_evidence_graph,
 )
+from app.services.neo4j import get_graph_health, get_sync_status, neo4j_manager
+from app.services.neo4j.backfill import backfill_organization_graph
+from app.services.neo4j.outbox_worker import retry_failed_outbox_events
+from app.services.neo4j.queries.agent_queries import (
+    query_agent_execution_graph,
+    query_agent_investigations,
+    query_cross_investigation_analytics,
+)
+from app.services.neo4j.queries.obligation_queries import (
+    query_obligation_graph,
+    query_relationship_path,
+    query_vendor_network,
+    search_obligation_graph,
+)
+from app.services.neo4j.queries.vendor_queries import query_graph_risk_discovery
+from app.services.neo4j.sync_service import sync_transaction_to_neo4j
 from app.services.llm.adapter import record_llm_telemetry, test_gemini_connection
 from app.services.risk.engine import compute_vendor_profile, evaluate_transaction_risk
 
@@ -307,6 +323,132 @@ def get_dashboard_summary(
     }
 
 
+@router.get("/graph/health")
+def graph_health_endpoint(
+    current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return get_graph_health(db, current_user.organization_id)
+
+
+@router.get("/graph/sync/status")
+def graph_sync_status_endpoint(
+    current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return get_sync_status(db, current_user.organization_id)
+
+
+@router.post("/graph/sync/backfill")
+def graph_sync_backfill_endpoint(
+    current_user: CurrentUserContext = Depends(require_permission("admin:config:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    res = backfill_organization_graph(db, organization_id=current_user.organization_id)
+    record_audit_event(
+        db,
+        organization_id=current_user.organization_id,
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action="GRAPH_BACKFILL_EXECUTED",
+        entity_type="graph",
+        entity_id=str(current_user.organization_id),
+        after={"ok": res.get("ok"), "nodes_synchronized": res.get("nodes_synchronized", 0)},
+    )
+    db.commit()
+    return res
+
+
+@router.post("/graph/sync/rebuild/{transaction_id}")
+def graph_sync_rebuild_tx_endpoint(
+    transaction_id: UUID,
+    current_user: CurrentUserContext = Depends(require_permission("admin:config:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    _ensure_org_transaction(db, current_user.organization_id, transaction_id)
+    ok = sync_transaction_to_neo4j(
+        db, organization_id=current_user.organization_id, transaction_id=transaction_id
+    )
+    return {"ok": ok, "transaction_id": str(transaction_id)}
+
+
+@router.post("/graph/sync/retry-failed")
+def graph_sync_retry_failed_endpoint(
+    current_user: CurrentUserContext = Depends(require_permission("admin:config:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return retry_failed_outbox_events(db, organization_id=current_user.organization_id)
+
+
+@router.get("/graph/obligations/vendor/{vendor_id}")
+def get_vendor_obligation_network(
+    vendor_id: UUID,
+    current_user: CurrentUserContext = Depends(require_permission("vendors:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return query_vendor_network(
+        db, organization_id=current_user.organization_id, vendor_id=vendor_id
+    )
+
+
+@router.get("/graph/obligations/path")
+def get_obligation_relationship_path(
+    source_graph_key: str = Query(..., min_length=3, max_length=256),
+    target_graph_key: str = Query(..., min_length=3, max_length=256),
+    current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
+) -> dict[str, Any]:
+    return query_relationship_path(
+        organization_id=current_user.organization_id,
+        source_graph_key=source_graph_key,
+        target_graph_key=target_graph_key,
+    )
+
+
+@router.get("/graph/obligations/search")
+def search_obligation_nodes(
+    q: str = Query(..., min_length=1, max_length=100),
+    current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
+) -> dict[str, Any]:
+    return {
+        "items": search_obligation_graph(
+            organization_id=current_user.organization_id, q=q
+        )
+    }
+
+
+@router.get("/graph/risk-discovery")
+def get_graph_risk_discovery(
+    current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
+) -> dict[str, Any]:
+    return query_graph_risk_discovery(organization_id=current_user.organization_id)
+
+
+@router.get("/graph/agents/investigations")
+def get_agent_graph_investigations(
+    current_user: CurrentUserContext = Depends(require_permission("exceptions:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return query_agent_investigations(db, organization_id=current_user.organization_id)
+
+
+@router.get("/graph/agents/investigations/{investigation_id}")
+def get_agent_graph_execution(
+    investigation_id: UUID,
+    current_user: CurrentUserContext = Depends(require_permission("exceptions:read")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    return query_agent_execution_graph(
+        db, organization_id=current_user.organization_id, investigation_id=investigation_id
+    )
+
+
+@router.get("/graph/agents/analytics")
+def get_agent_graph_analytics(
+    current_user: CurrentUserContext = Depends(require_permission("exceptions:read")),
+) -> dict[str, Any]:
+    return query_cross_investigation_analytics(organization_id=current_user.organization_id)
+
+
 @router.get("/graph/transactions/{transaction_id}")
 def get_transaction_graph(
     transaction_id: UUID,
@@ -321,6 +463,13 @@ def get_transaction_graph(
             status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     _ensure_org_transaction(db, current_user.organization_id, transaction_id)
+    if neo4j_manager.is_enabled() and neo4j_manager.verify_connectivity()[0]:
+        return query_obligation_graph(
+            db,
+            organization_id=current_user.organization_id,
+            transaction_id=transaction_id,
+            view="overview",
+        )
     return build_transaction_evidence_graph(
         db,
         organization_id=current_user.organization_id,
@@ -342,6 +491,32 @@ def rebuild_transaction_graph(
             status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     _ensure_org_transaction(db, current_user.organization_id, transaction_id)
+    if neo4j_manager.is_enabled() and neo4j_manager.verify_connectivity()[0]:
+        sync_transaction_to_neo4j(
+            db, organization_id=current_user.organization_id, transaction_id=transaction_id
+        )
+        graph = query_obligation_graph(
+            db,
+            organization_id=current_user.organization_id,
+            transaction_id=transaction_id,
+            view="overview",
+        )
+        record_audit_event(
+            db,
+            organization_id=current_user.organization_id,
+            actor_type="USER",
+            actor_id=str(current_user.id),
+            action="GRAPH_REBUILT",
+            entity_type="evidence_graph",
+            entity_id=str(transaction_id),
+            after={
+                "node_count": len(graph.get("nodes", [])),
+                "edge_count": len(graph.get("edges", [])),
+                "source": "neo4j",
+            },
+        )
+        db.commit()
+        return graph
     return rebuild_transaction_evidence_graph(
         db,
         organization_id=current_user.organization_id,
@@ -353,6 +528,7 @@ def rebuild_transaction_graph(
 @router.get("/graph/obligations/{transaction_id}")
 def get_transaction_obligation_graph(
     transaction_id: UUID,
+    view: str = Query(default="overview", pattern="^(overview|evidence|vendor|fulfilment)$"),
     current_user: CurrentUserContext = Depends(require_permission("transactions:read")),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -363,10 +539,11 @@ def get_transaction_obligation_graph(
             status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     _ensure_org_transaction(db, current_user.organization_id, transaction_id)
-    return build_transaction_obligation_graph(
+    return query_obligation_graph(
         db,
         organization_id=current_user.organization_id,
         transaction_id=transaction_id,
+        view=view,
     )
 
 
@@ -596,6 +773,7 @@ def get_agent_harness_overview(
             "active_provider": settings.llm_provider,
             "active_model": active_model,
             "graph_available": settings.feature_evidence_graph,
+            "graph_sync": get_sync_status(db, org_id),
             "total_investigations": len(recent_traces),
             "successful_investigations": sum(
                 1 for t in recent_traces if t["status"] in ("DRAFT_READY", "COMPLETED")
