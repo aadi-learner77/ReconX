@@ -7,23 +7,28 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, File, Form, Header, Query, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
-from sqlalchemy import asc, desc, func, select
+from sqlalchemy import asc, delete, desc, func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.exceptions import AppError
 from app.core.permissions import CurrentUserContext, require_permission
 from app.models.domain import (
+    Approval,
     Document,
     ExceptionCase,
+    ExceptionComment,
     ExtractionField,
     GoodsReceipt,
     GRNLine,
+    Investigation,
     Invoice,
     InvoiceLine,
     Job,
+    MatchResult,
     POLine,
     PurchaseOrder,
+    ReconciliationRun,
     RiskSignal,
     Vendor,
 )
@@ -569,6 +574,44 @@ def verify_and_commit_document(
                 "line_total": str(total_amt),
             }
         ]
+        po_obj = (
+            OrgScopedRepository(db, PurchaseOrder, current_user.organization_id).get_by_id(po_id)
+            if po_id
+            else None
+        )
+        po_lines_by_code = {ln.item_code: ln for ln in po_obj.lines} if po_obj else {}
+        default_po_line = po_obj.lines[0] if po_obj and len(po_obj.lines) == 1 else None
+        inferred_tax_rate = (
+            (tax_amt / sub_amt).quantize(Decimal("0.0001"))
+            if sub_amt > 0 and tax_amt > 0
+            else Decimal("0")
+        )
+
+        inv_lines_models: list[InvoiceLine] = []
+        for ln in raw_lines or fallback_inv_lines:
+            ic = str(ln.get("item_code", ""))
+            matched_pl = po_lines_by_code.get(ic) or default_po_line
+            ln_tax = Decimal(str(ln.get("tax_amount", str(tax_amt) if not raw_lines else "0")))
+            ln_rate = (
+                matched_pl.tax_rate
+                if matched_pl is not None
+                else inferred_tax_rate
+            )
+            inv_lines_models.append(
+                InvoiceLine(
+                    organization_id=current_user.organization_id,
+                    po_line_id=matched_pl.id if matched_pl else None,
+                    item_code=ic or (matched_pl.item_code if matched_pl else ""),
+                    description=str(ln.get("description", "Invoice Item")),
+                    uom=str(ln.get("uom", "EA")),
+                    quantity=Decimal(str(ln.get("quantity", "1"))),
+                    unit_price=Decimal(str(ln.get("unit_price", str(sub_amt)))),
+                    tax_rate=ln_rate,
+                    tax_amount=ln_tax,
+                    line_total=Decimal(str(ln.get("line_total", str(total_amt)))),
+                )
+            )
+
         inv = Invoice(
             organization_id=current_user.organization_id,
             vendor_id=vendor.id,
@@ -584,19 +627,7 @@ def verify_and_commit_document(
             status="REVIEW_REQUIRED" if dup_of_id else "PENDING",
             document_id=doc.id,
             duplicate_of_invoice_id=dup_of_id,
-            lines=[
-                InvoiceLine(
-                    organization_id=current_user.organization_id,
-                    item_code=str(ln.get("item_code", "")),
-                    description=str(ln.get("description", "Invoice Item")),
-                    uom=str(ln.get("uom", "EA")),
-                    quantity=Decimal(str(ln.get("quantity", "1"))),
-                    unit_price=Decimal(str(ln.get("unit_price", str(sub_amt)))),
-                    tax_amount=Decimal(str(ln.get("tax_amount", "0"))),
-                    line_total=Decimal(str(ln.get("line_total", str(total_amt)))),
-                )
-                for ln in (raw_lines or fallback_inv_lines)
-            ],
+            lines=inv_lines_models,
         )
         db.add(inv)
         db.flush()
@@ -657,6 +688,219 @@ def verify_and_commit_document(
         "entity_type": entity_type,
         "entity_id": entity_id,
         "transaction_id": str(doc.transaction_id),
+    }
+
+
+def _purge_transaction_artifacts(db: Session, org_id: UUID, tx_id: UUID) -> None:
+    case_ids = list(
+        db.scalars(
+            select(ExceptionCase.id).where(
+                ExceptionCase.organization_id == org_id,
+                ExceptionCase.transaction_id == tx_id,
+            )
+        ).all()
+    )
+    if case_ids:
+        db.execute(delete(ExceptionComment).where(ExceptionComment.exception_id.in_(case_ids)))
+        db.execute(delete(Investigation).where(Investigation.exception_id.in_(case_ids)))
+        db.execute(delete(Approval).where(Approval.exception_id.in_(case_ids)))
+        db.execute(delete(ExceptionCase).where(ExceptionCase.id.in_(case_ids)))
+    run_ids = list(
+        db.scalars(
+            select(ReconciliationRun.id).where(
+                ReconciliationRun.organization_id == org_id,
+                ReconciliationRun.transaction_id == tx_id,
+            )
+        ).all()
+    )
+    if run_ids:
+        db.execute(delete(MatchResult).where(MatchResult.reconciliation_run_id.in_(run_ids)))
+        db.execute(delete(ReconciliationRun).where(ReconciliationRun.id.in_(run_ids)))
+    db.execute(
+        delete(RiskSignal).where(
+            RiskSignal.organization_id == org_id,
+            RiskSignal.transaction_id == tx_id,
+        )
+    )
+
+
+@router.delete("/documents/{document_id}")
+def delete_document(
+    document_id: UUID,
+    current_user: CurrentUserContext = Depends(require_permission("documents:write")),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Delete a document and cleanly reconcile or remove downstream consequences."""
+    from app.services.reconciliation_adapter import execute_reconciliation
+
+    org_id = current_user.organization_id
+    doc = OrgScopedRepository(db, Document, org_id).get_by_id(document_id)
+    if not doc:
+        raise AppError("DOCUMENT_NOT_FOUND", "Document not found.", status.HTTP_404_NOT_FOUND)
+
+    file_name = doc.file_name
+    storage_key = doc.storage_key
+    affected_po_ids: set[UUID] = set()
+
+    # 1. Clear self-referential duplicate pointers & document jobs
+    db.execute(
+        update(Document)
+        .where(Document.organization_id == org_id, Document.duplicate_of_document_id == doc.id)
+        .values(duplicate_of_document_id=None)
+    )
+    db.execute(
+        delete(Job).where(
+            Job.organization_id == org_id,
+            Job.entity_type == "document",
+            Job.entity_id == str(doc.id),
+        )
+    )
+
+    # 2. Clean up committed Invoices derived from this document
+    inv_rows = list(
+        db.scalars(
+            OrgScopedRepository(db, Invoice, org_id)
+            .base_query()
+            .where(Invoice.document_id == doc.id)
+        ).all()
+    )
+    for inv in inv_rows:
+        if inv.po_id:
+            affected_po_ids.add(inv.po_id)
+        db.execute(
+            update(Invoice)
+            .where(Invoice.organization_id == org_id, Invoice.duplicate_of_invoice_id == inv.id)
+            .values(duplicate_of_invoice_id=None)
+        )
+        target_tx_id = inv.po_id or inv.id
+        if inv.duplicate_of_invoice_id:
+            db.execute(
+                delete(RiskSignal).where(
+                    RiskSignal.organization_id == org_id,
+                    RiskSignal.transaction_id == target_tx_id,
+                    RiskSignal.signal_type == "EXACT_DUPLICATE_INVOICE",
+                )
+            )
+            db.execute(
+                delete(ExceptionCase).where(
+                    ExceptionCase.organization_id == org_id,
+                    ExceptionCase.transaction_id == target_tx_id,
+                    ExceptionCase.type == "DUPLICATE_INVOICE",
+                )
+            )
+        if not inv.po_id:
+            _purge_transaction_artifacts(db, org_id, inv.id)
+        db.execute(delete(InvoiceLine).where(InvoiceLine.invoice_id == inv.id))
+        db.delete(inv)
+
+    # 3. Clean up committed Goods Receipts derived from this document
+    grn_rows = list(
+        db.scalars(
+            OrgScopedRepository(db, GoodsReceipt, org_id)
+            .base_query()
+            .where(GoodsReceipt.document_id == doc.id)
+        ).all()
+    )
+    for grn in grn_rows:
+        if grn.po_id:
+            affected_po_ids.add(grn.po_id)
+        db.execute(delete(GRNLine).where(GRNLine.grn_id == grn.id))
+        db.delete(grn)
+
+    # 4. Clean up committed Purchase Orders derived from this document
+    po_rows = list(
+        db.scalars(
+            OrgScopedRepository(db, PurchaseOrder, org_id)
+            .base_query()
+            .where(PurchaseOrder.document_id == doc.id)
+        ).all()
+    )
+    deleted_po_ids: set[UUID] = set()
+    for po in po_rows:
+        deleted_po_ids.add(po.id)
+        affected_po_ids.discard(po.id)
+        db.execute(
+            update(Document)
+            .where(Document.organization_id == org_id, Document.transaction_id == po.id)
+            .values(transaction_id=None)
+        )
+        db.execute(
+            update(Invoice)
+            .where(Invoice.organization_id == org_id, Invoice.po_id == po.id)
+            .values(po_id=None)
+        )
+        db.execute(
+            update(GoodsReceipt)
+            .where(GoodsReceipt.organization_id == org_id, GoodsReceipt.po_id == po.id)
+            .values(po_id=None)
+        )
+        _purge_transaction_artifacts(db, org_id, po.id)
+        db.execute(delete(POLine).where(POLine.po_id == po.id))
+        db.delete(po)
+
+    # 5. Delete ExtractionFields and the Document row itself
+    db.execute(delete(ExtractionField).where(ExtractionField.document_id == doc.id))
+    db.delete(doc)
+    db.flush()
+
+    # 6. Re-reconcile any existing POs whose invoices/GRNs changed
+    reconciled_po_ids: list[str] = []
+    for po_id in affected_po_ids:
+        if po_id in deleted_po_ids:
+            continue
+        po_exists = db.get(PurchaseOrder, po_id)
+        if not po_exists:
+            continue
+        had_run = db.scalar(
+            select(ReconciliationRun.id)
+            .where(
+                ReconciliationRun.organization_id == org_id,
+                ReconciliationRun.transaction_id == po_id,
+            )
+            .limit(1)
+        )
+        if had_run:
+            open_cases = list(
+                db.scalars(
+                    OrgScopedRepository(db, ExceptionCase, org_id)
+                    .base_query()
+                    .where(
+                        ExceptionCase.transaction_id == po_id,
+                        ExceptionCase.status.notin_(["APPROVED", "REJECTED"]),
+                    )
+                ).all()
+            )
+            for c in open_cases:
+                c.status = "APPROVED"
+                c.decision_rationale = "Auto-resolved after source document deletion."
+            db.flush()
+            execute_reconciliation(
+                db,
+                organization_id=org_id,
+                transaction_id=po_id,
+                actor_type="SYSTEM",
+                actor_id="document_deleted_reconcile",
+            )
+            reconciled_po_ids.append(str(po_id))
+
+    record_audit_event(
+        db,
+        organization_id=org_id,
+        actor_type="USER",
+        actor_id=str(current_user.id),
+        action="DOCUMENT_DELETED",
+        entity_type="document",
+        entity_id=str(document_id),
+        before={"file_name": file_name},
+        after={"reconciled_po_ids": reconciled_po_ids},
+    )
+    db.commit()
+    StorageAdapter().delete_bytes(storage_key)
+
+    return {
+        "deleted": True,
+        "document_id": str(document_id),
+        "reconciled_po_ids": reconciled_po_ids,
     }
 
 

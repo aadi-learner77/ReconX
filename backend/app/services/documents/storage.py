@@ -34,3 +34,10 @@ class StorageAdapter:
         if not str(target).startswith(str(self.root)):
             raise ValueError("Invalid storage key")
         return target
+
+    def delete_bytes(self, storage_key: str) -> bool:
+        target = self.resolve_path(storage_key)
+        if target.exists() and target.is_file():
+            target.unlink()
+            return True
+        return False

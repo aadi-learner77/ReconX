@@ -186,7 +186,7 @@ class _HTTPJsonLLMProvider(LLMProvider):
             return None
 
         last_err = "UNKNOWN"
-        for attempt in range(2):
+        for attempt in range(3):
             try:
                 raw = self._complete_json(system_prompt, user_prompt)
                 if raw:
@@ -209,8 +209,12 @@ class _HTTPJsonLLMProvider(LLMProvider):
                 last_err = "INVALID_RESPONSE"
             except Exception as exc:
                 last_err = _categorize_exception(exc)
-                if attempt == 0:
+                if attempt < 2 and last_err in ("HTTP_503", "RATE_LIMITED", "TIMEOUT", "NETWORK_ERROR"):
+                    time.sleep(0.4 * (attempt + 1))
+                elif attempt == 0:
                     time.sleep(0.2)
+                else:
+                    break
 
         self.last_telemetry = LLMCallTelemetry(
             configured_provider=self.provider_name,

@@ -100,7 +100,12 @@ def full_reset_for_demo(db: Session) -> None:
     db.commit()
 
 
-def seed_synthetic_dataset(db: Session, *, reset: bool = False) -> dict[str, str | int]:
+def seed_synthetic_dataset(
+    db: Session,
+    *,
+    reset: bool = False,
+    seed_baseline_reconciliation: bool = False,
+) -> dict[str, str | int]:
     if reset:
         reset_domain_data(db)
 
@@ -769,6 +774,49 @@ def seed_synthetic_dataset(db: Session, *, reset: bool = False) -> dict[str, str
             .order_by(PurchaseOrder.po_number)
         ).all()
     )
+    if seed_baseline_reconciliation:
+        from app.services.reconciliation_adapter import execute_reconciliation
+
+        first_po = po_rows[0] if po_rows else None
+        seed_uploader = db.scalar(
+            select(User).where(User.organization_id == org.id).limit(1)
+        )
+        if first_po and seed_uploader:
+            for d_idx, (fname, dtype) in enumerate(
+                [
+                    (f"{first_po.po_number}.pdf", "PO"),
+                    ("GRN-2026-0001.pdf", "GRN"),
+                    ("INV-BPC-1001.pdf", "INVOICE"),
+                ]
+            ):
+                doc_id = _det_uuid(f"seed-doc-{d_idx}")
+                if not db.get(Document, doc_id):
+                    db.add(
+                        Document(
+                            id=doc_id,
+                            organization_id=org.id,
+                            uploaded_by=seed_uploader.id,
+                            file_name=fname,
+                            mime_type="application/pdf",
+                            file_size_bytes=12400 + d_idx * 350,
+                            checksum=hashlib.sha256(fname.encode("utf-8")).hexdigest(),
+                            storage_key=f"seed/{fname}",
+                            document_type=dtype,
+                            classification_confidence=Decimal("0.9800"),
+                            status="VERIFIED",
+                            transaction_id=first_po.id,
+                        )
+                    )
+            db.flush()
+
+        for po_row in po_rows[:20]:
+            execute_reconciliation(
+                db,
+                organization_id=org.id,
+                transaction_id=po_row.id,
+                actor_type="SYSTEM",
+                actor_id="seed_baseline",
+            )
     inv_rows = list(
         db.scalars(
             select(Invoice)
@@ -793,6 +841,11 @@ def seed_synthetic_dataset(db: Session, *, reset: bool = False) -> dict[str, str
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed synthetic ReconX AI dataset")
     parser.add_argument("--reset", action="store_true", help="Reset domain records before seeding")
+    parser.add_argument(
+        "--no-baseline",
+        action="store_true",
+        help="Skip baseline reconciliation & sample documents",
+    )
     args = parser.parse_args()
 
     if str(engine.url).startswith("sqlite"):
@@ -800,7 +853,11 @@ def main() -> None:
         ensure_sqlite_audit_triggers(engine)
 
     with SessionLocal() as db:
-        summary = seed_synthetic_dataset(db, reset=args.reset)
+        summary = seed_synthetic_dataset(
+            db,
+            reset=args.reset,
+            seed_baseline_reconciliation=not args.no_baseline,
+        )
         print(f"Seed complete: {summary}")
 
 
